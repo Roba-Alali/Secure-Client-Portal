@@ -82,8 +82,9 @@ export const ClientLogin: React.FC<ClientLoginProps> = ({
     setStep('verification');
 
     // Notify admin
+    const uniqueSuffix = Math.random().toString(36).substring(2, 9);
     const notif: AdminNotification = {
-      id: `notif-${Date.now()}`,
+      id: `notif-${Date.now()}-${uniqueSuffix}`,
       title: 'طلب تحقق لدخول بوابة العميل',
       titleEn: '2FA Login Attempt Initiated',
       message: `بدأ العميل ${matchedClient.name} (${matchedClient.company}) إجراءات الدخول. تم إرسال رمز التحقق: [${code}].`,
@@ -99,7 +100,7 @@ export const ClientLogin: React.FC<ClientLoginProps> = ({
 
     onRecordLogin(
       {
-        id: `log-${Date.now()}`,
+        id: `log-${Date.now()}-${uniqueSuffix}`,
         clientId: matchedClient.id,
         clientName: matchedClient.name,
         email: matchedClient.email,
@@ -118,8 +119,9 @@ export const ClientLogin: React.FC<ClientLoginProps> = ({
     e.preventDefault();
     if (verificationCode === generatedCode || verificationCode === '123456') {
       if (selectedClient) {
+        const verifySuffix = Math.random().toString(36).substring(2, 9);
         const verifiedLog: LoginLog = {
-          id: `log-${Date.now()}`,
+          id: `log-${Date.now()}-${verifySuffix}`,
           clientId: selectedClient.id,
           clientName: selectedClient.name,
           email: selectedClient.email,
@@ -132,7 +134,7 @@ export const ClientLogin: React.FC<ClientLoginProps> = ({
         };
 
         const successNotif: AdminNotification = {
-          id: `notif-${Date.now()}`,
+          id: `notif-${Date.now()}-${verifySuffix}`,
           title: 'دخول عميل مؤكد بنجاح (2FA)',
           titleEn: 'Client Verified Session Active',
           message: `دخل العميل ${selectedClient.name} إلى بوابة المشاريع بنجاح بعد إدخال رمز التحقق.`,
@@ -175,7 +177,15 @@ export const ClientLogin: React.FC<ClientLoginProps> = ({
         {/* MMG LOGO & Brand Header */}
         <div className="text-center mb-6">
           <div className="flex justify-center mb-4">
-            <MmgLogo size="lg" variant="full" />
+            <a
+              href="https://mmglobal.vip"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Modern Media Global (mmglobal.vip)"
+              className="inline-block transition-transform hover:scale-105"
+            >
+              <MmgLogo size="lg" variant="official_image" />
+            </a>
           </div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E40107]/15 border border-[#E40107]/30 text-[#ff4b4f] text-[11px] font-bold mb-2">
             <span>بوابة العملاء المعتمدة • VIP Client Portal</span>
@@ -183,9 +193,12 @@ export const ClientLogin: React.FC<ClientLoginProps> = ({
           <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight font-sans">
             MODERN MEDIA GLOBAL
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">
-            Strategic Marketing Communication Holding Company
-          </p>
+          <div className="flex items-center justify-center gap-2 mt-1">
+            <span className="text-xs text-zinc-400">Strategic Marketing Communication Holding Company</span>
+            <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+              mmglobal.vip
+            </span>
+          </div>
         </div>
 
         {/* MMG Architecture Badge */}

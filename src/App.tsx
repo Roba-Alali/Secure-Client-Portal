@@ -100,16 +100,28 @@ export default function App() {
   };
 
   const handleRecordLogin = (log: LoginLog, notif?: AdminNotification) => {
-    setLoginLogs((prev) => [log, ...prev]);
+    setLoginLogs((prev) => {
+      if (prev.some((l) => l.id === log.id)) return prev;
+      return [log, ...prev];
+    });
     if (notif) {
-      setNotifications((prev) => [notif, ...prev]);
+      setNotifications((prev) => {
+        if (prev.some((n) => n.id === notif.id)) return prev;
+        return [notif, ...prev];
+      });
     }
   };
 
   const handleRecordView = (log: ViewLog, notif?: AdminNotification) => {
-    setViewLogs((prev) => [log, ...prev]);
+    setViewLogs((prev) => {
+      if (prev.some((v) => v.id === log.id)) return prev;
+      return [log, ...prev];
+    });
     if (notif) {
-      setNotifications((prev) => [notif, ...prev]);
+      setNotifications((prev) => {
+        if (prev.some((n) => n.id === notif.id)) return prev;
+        return [notif, ...prev];
+      });
     }
     // Increment document view count
     setDocuments((prevDocs) =>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { DocumentItem, ClientUser, WatermarkConfig, ViewLog, AdminNotification } from '../../types';
 import { WatermarkOverlay } from '../WatermarkOverlay';
 import { MmgLogo } from '../MmgLogo';
+import { MobileScreenshotShield } from '../MobileScreenshotShield';
 import {
   X,
   ChevronRight,
@@ -38,6 +39,7 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
   const [maxPageSeen, setMaxPageSeen] = useState(1);
   const [securityToast, setSecurityToast] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hasRecordedInitialView = useRef(false);
 
   const totalPages = document.pageCount || document.contentPages?.length || 5;
 
@@ -47,40 +49,44 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
       setSecondsSpent((prev) => prev + 1);
     }, 1000);
 
-    // Initial alert for Admin
-    const initialLog: ViewLog = {
-      id: `view-${Date.now()}`,
-      documentId: document.id,
-      documentTitle: document.title,
-      fileType: 'pdf',
-      clientId: client.id,
-      clientName: client.name,
-      clientEmail: client.email,
-      ipAddress: client.ipAddress || '197.34.12.88',
-      durationSeconds: 1,
-      pagesViewed: 1,
-      maxPageReached: 1,
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      watermarkApplied: `${client.email} | ${client.ipAddress || '197.34.12.88'} | ${new Date().toLocaleTimeString()}`
-    };
-
-    const alertNotif: AdminNotification = {
-      id: `notif-${Date.now()}`,
-      title: 'فتح مستند محمي (PDF Viewer)',
-      titleEn: 'Protected PDF Opened',
-      message: `قام العميل ${client.name} (${client.company}) بفتح المستند المحمي: "${document.title}". تم تطبيق العلامة المائية الديناميكية.`,
-      messageEn: `Client ${client.name} opened protected document "${document.title}". Dynamic watermark active.`,
-      type: 'view',
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      read: false,
-      metadata: {
-        clientId: client.id,
+    if (!hasRecordedInitialView.current) {
+      hasRecordedInitialView.current = true;
+      const uniqueSuffix = Math.random().toString(36).substring(2, 9);
+      // Initial alert for Admin
+      const initialLog: ViewLog = {
+        id: `view-${Date.now()}-${uniqueSuffix}`,
         documentId: document.id,
-        ipAddress: client.ipAddress
-      }
-    };
+        documentTitle: document.title,
+        fileType: 'pdf',
+        clientId: client.id,
+        clientName: client.name,
+        clientEmail: client.email,
+        ipAddress: client.ipAddress || '197.34.12.88',
+        durationSeconds: 1,
+        pagesViewed: 1,
+        maxPageReached: 1,
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        watermarkApplied: `${client.email} | ${client.ipAddress || '197.34.12.88'} | ${new Date().toLocaleTimeString()}`
+      };
 
-    onRecordView(initialLog, alertNotif);
+      const alertNotif: AdminNotification = {
+        id: `notif-${Date.now()}-${uniqueSuffix}`,
+        title: 'فتح مستند محمي (PDF Viewer)',
+        titleEn: 'Protected PDF Opened',
+        message: `قام العميل ${client.name} (${client.company}) بفتح المستند المحمي: "${document.title}". تم تطبيق العلامة المائية الديناميكية.`,
+        messageEn: `Client ${client.name} opened protected document "${document.title}". Dynamic watermark active.`,
+        type: 'view',
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        read: false,
+        metadata: {
+          clientId: client.id,
+          documentId: document.id,
+          ipAddress: client.ipAddress
+        }
+      };
+
+      onRecordView(initialLog, alertNotif);
+    }
 
     return () => clearInterval(timer);
   }, []);
@@ -94,8 +100,9 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
 
   // Handle Close and update final duration
   const handleClose = () => {
+    const uniqueSuffix = Math.random().toString(36).substring(2, 9);
     const finalLog: ViewLog = {
-      id: `view-${Date.now()}`,
+      id: `view-${Date.now()}-${uniqueSuffix}`,
       documentId: document.id,
       documentTitle: document.title,
       fileType: 'pdf',
@@ -242,11 +249,19 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
         </div>
       </div>
 
-      {/* Main Canvas / Document Stage */}
-      <div
-        ref={containerRef}
-        className="flex-1 overflow-auto p-4 md:p-8 flex justify-center items-start bg-[#09090b]/90"
-      >
+      {/* Main Canvas / Document Stage with Mobile Screenshot Shield */}
+      <div className="flex-1 relative overflow-hidden bg-[#09090b]/90">
+        <MobileScreenshotShield
+          clientName={client.name}
+          clientEmail={client.email}
+          clientIp={client.ipAddress || '197.34.12.88'}
+          documentTitle={document.title}
+          enabled={watermarkConfig.mobileScreenshotShield !== false}
+        >
+          <div
+            ref={containerRef}
+            className="w-full h-full overflow-auto p-4 md:p-8 flex justify-center items-start"
+          >
         <div
           className="relative transition-all duration-200 shadow-2xl rounded-sm border border-slate-700/60 overflow-hidden"
           style={{
@@ -345,13 +360,15 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
             </div>
 
             {/* Document Footer */}
-            <div className="pt-6 border-t border-zinc-200 flex justify-between items-center text-[10px] text-zinc-500 font-mono">
-              <div>CONFIDENTIAL • FOR AUTHORIZED EYES ONLY • MMGLOBAL.VIP</div>
-              <div>PAGE {currentPage} OF {totalPages}</div>
+              <div className="pt-6 border-t border-zinc-200 flex justify-between items-center text-[10px] text-zinc-500 font-mono">
+                <div>CONFIDENTIAL • FOR AUTHORIZED EYES ONLY • MMGLOBAL.VIP</div>
+                <div>PAGE {currentPage} OF {totalPages}</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </MobileScreenshotShield>
+    </div>
 
       {/* Bottom Bar: Mobile Pagination & Security Reminder */}
       <div className="h-12 bg-[#0c0c0e] border-t border-zinc-800 px-4 flex items-center justify-between text-xs text-zinc-400">

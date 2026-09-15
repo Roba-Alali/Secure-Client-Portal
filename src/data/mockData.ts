@@ -434,7 +434,12 @@ export const initialWatermarkConfig: WatermarkConfig = {
   driftAnimation: true,
   showClientName: true,
   showTimestamp: true,
-  showIp: true
+  showIp: true,
+  mobileScreenshotShield: true,
+  obscureOnAppSwitch: true,
+  multiTouchGestureShield: true,
+  dynamicFloatingPill: true,
+  antiCropCornerStamps: true
 };
 
 export const initialLoginLogs: LoginLog[] = [

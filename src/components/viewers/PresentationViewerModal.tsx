@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { DocumentItem, ClientUser, WatermarkConfig, ViewLog, AdminNotification } from '../../types';
 import { WatermarkOverlay } from '../WatermarkOverlay';
 import { MmgLogo } from '../MmgLogo';
+import { MobileScreenshotShield } from '../MobileScreenshotShield';
 import {
   X,
   ChevronRight,
@@ -40,51 +41,57 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
   ];
 
   const totalSlides = slides.length;
+  const hasRecordedInitialView = useRef(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setSecondsSpent((prev) => prev + 1);
     }, 1000);
 
-    const alertNotif: AdminNotification = {
-      id: `notif-${Date.now()}`,
-      title: 'استعراض عرض تقديمي محمي لـ MMG',
-      titleEn: 'Protected Presentation Viewed',
-      message: `بدأ العميل ${client.name} استعراض شرائح العرض التقديمي: "${document.title}".`,
-      messageEn: `Client ${client.name} opened presentation deck "${document.title}".`,
-      type: 'view',
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      read: false,
-      metadata: {
+    if (!hasRecordedInitialView.current) {
+      hasRecordedInitialView.current = true;
+      const uniqueSuffix = Math.random().toString(36).substring(2, 9);
+      const alertNotif: AdminNotification = {
+        id: `notif-${Date.now()}-${uniqueSuffix}`,
+        title: 'استعراض عرض تقديمي محمي لـ MMG',
+        titleEn: 'Protected Presentation Viewed',
+        message: `بدأ العميل ${client.name} استعراض شرائح العرض التقديمي: "${document.title}".`,
+        messageEn: `Client ${client.name} opened presentation deck "${document.title}".`,
+        type: 'view',
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        read: false,
+        metadata: {
+          clientId: client.id,
+          documentId: document.id
+        }
+      };
+
+      const initialLog: ViewLog = {
+        id: `view-${Date.now()}-${uniqueSuffix}`,
+        documentId: document.id,
+        documentTitle: document.title,
+        fileType: 'presentation',
         clientId: client.id,
-        documentId: document.id
-      }
-    };
+        clientName: client.name,
+        clientEmail: client.email,
+        ipAddress: client.ipAddress || '197.34.12.88',
+        durationSeconds: 1,
+        pagesViewed: 1,
+        maxPageReached: 1,
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        watermarkApplied: `${client.email} | ${client.ipAddress || '197.34.12.88'}`
+      };
 
-    const initialLog: ViewLog = {
-      id: `view-${Date.now()}`,
-      documentId: document.id,
-      documentTitle: document.title,
-      fileType: 'presentation',
-      clientId: client.id,
-      clientName: client.name,
-      clientEmail: client.email,
-      ipAddress: client.ipAddress || '197.34.12.88',
-      durationSeconds: 1,
-      pagesViewed: 1,
-      maxPageReached: 1,
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      watermarkApplied: `${client.email} | ${client.ipAddress || '197.34.12.88'}`
-    };
-
-    onRecordView(initialLog, alertNotif);
+      onRecordView(initialLog, alertNotif);
+    }
 
     return () => clearInterval(timer);
   }, []);
 
   const handleClose = () => {
+    const uniqueSuffix = Math.random().toString(36).substring(2, 9);
     const finalLog: ViewLog = {
-      id: `view-${Date.now()}`,
+      id: `view-${Date.now()}-${uniqueSuffix}`,
       documentId: document.id,
       documentTitle: document.title,
       fileType: 'presentation',
@@ -142,61 +149,71 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
         </div>
       </div>
 
-      {/* Main Slide Presentation Stage */}
-      <div className="flex-1 flex items-center justify-center p-4 md:p-10 relative overflow-hidden bg-[#09090b]/80">
-        <div className="relative w-full max-w-4xl aspect-[16/10] bg-[#121216] rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden flex flex-col justify-between p-8 md:p-12">
-          {/* Dynamic Watermark Overlay */}
-          <WatermarkOverlay
-            config={watermarkConfig}
-            clientEmail={client.email}
-            clientName={client.name}
-            clientIp={client.ipAddress || '197.34.12.88'}
-            documentTitle={document.title}
-          />
+      {/* Main Slide Presentation Stage with Mobile Screenshot Shield */}
+      <div className="flex-1 relative overflow-hidden bg-[#09090b]/90">
+        <MobileScreenshotShield
+          clientName={client.name}
+          clientEmail={client.email}
+          clientIp={client.ipAddress || '197.34.12.88'}
+          documentTitle={document.title}
+          enabled={watermarkConfig.mobileScreenshotShield !== false}
+        >
+          <div className="w-full h-full flex items-center justify-center p-4 md:p-10 overflow-auto">
+            <div className="relative w-full max-w-4xl aspect-[16/10] bg-[#121216] rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden flex flex-col justify-between p-8 md:p-12">
+              {/* Dynamic Watermark Overlay */}
+              <WatermarkOverlay
+                config={watermarkConfig}
+                clientEmail={client.email}
+                clientName={client.name}
+                clientIp={client.ipAddress || '197.34.12.88'}
+                documentTitle={document.title}
+              />
 
-          {/* Slide Top Banner */}
-          <div className="flex justify-between items-center border-b border-zinc-800 pb-4">
-            <div className="flex items-center gap-2 text-xs text-[#ff4b4f] font-bold uppercase tracking-wider">
-              <PieChart className="w-4 h-4 text-[#E40107]" />
-              <span>MMG PRESENTATION • SLIDE {currentSlide + 1}</span>
-            </div>
-            <div className="text-xs font-mono text-zinc-300 bg-zinc-950 px-2.5 py-1 rounded-lg border border-zinc-800">
-              {client.email}
-            </div>
-          </div>
-
-          {/* Slide Body */}
-          <div className="my-auto py-6">
-            <h1 className="text-2xl md:text-3xl font-black text-white mb-2 leading-relaxed font-sans">
-              {currentSlideData.title}
-            </h1>
-            <p className="text-base text-zinc-300 mb-8 font-medium">
-              {currentSlideData.subtitle}
-            </p>
-
-            <div className="space-y-3">
-              {currentSlideData.content.map((point, idx) => (
-                <div key={idx} className="flex items-start gap-3 bg-zinc-950/70 p-3.5 rounded-xl border border-zinc-800/80">
-                  <div className="w-6 h-6 rounded-full bg-[#E40107]/20 text-[#ff4b4f] flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 border border-[#E40107]/30">
-                    {idx + 1}
-                  </div>
-                  <span className="text-zinc-200 text-sm md:text-base font-medium">{point}</span>
+              {/* Slide Top Banner */}
+              <div className="flex justify-between items-center border-b border-zinc-800 pb-4">
+                <div className="flex items-center gap-2 text-xs text-[#ff4b4f] font-bold uppercase tracking-wider">
+                  <PieChart className="w-4 h-4 text-[#E40107]" />
+                  <span>MMG PRESENTATION • SLIDE {currentSlide + 1}</span>
                 </div>
-              ))}
-            </div>
-          </div>
+                <div className="text-xs font-mono text-zinc-300 bg-zinc-950 px-2.5 py-1 rounded-lg border border-zinc-800">
+                  {client.email}
+                </div>
+              </div>
 
-          {/* Slide Footer */}
-          <div className="flex justify-between items-center pt-4 border-t border-zinc-800 text-xs text-zinc-400">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-[#E40107]" />
-              <span>بوابة MMG VIP الآمنة • Modern Media Global (mmglobal.vip)</span>
-            </div>
-            <div className="font-mono text-zinc-400">
-              CONFIDENTIAL • {currentSlide + 1} / {totalSlides}
+              {/* Slide Body */}
+              <div className="my-auto py-6">
+                <h1 className="text-2xl md:text-3xl font-black text-white mb-2 leading-relaxed font-sans">
+                  {currentSlideData.title}
+                </h1>
+                <p className="text-base text-zinc-300 mb-8 font-medium">
+                  {currentSlideData.subtitle}
+                </p>
+
+                <div className="space-y-3">
+                  {currentSlideData.content.map((point, idx) => (
+                    <div key={idx} className="flex items-start gap-3 bg-zinc-950/70 p-3.5 rounded-xl border border-zinc-800/80">
+                      <div className="w-6 h-6 rounded-full bg-[#E40107]/20 text-[#ff4b4f] flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 border border-[#E40107]/30">
+                        {idx + 1}
+                      </div>
+                      <span className="text-zinc-200 text-sm md:text-base font-medium">{point}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Slide Footer */}
+              <div className="flex justify-between items-center pt-4 border-t border-zinc-800 text-xs text-zinc-400">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-[#E40107]" />
+                  <span>بوابة MMG VIP الآمنة • Modern Media Global (mmglobal.vip)</span>
+                </div>
+                <div className="font-mono text-zinc-400">
+                  CONFIDENTIAL • {currentSlide + 1} / {totalSlides}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </MobileScreenshotShield>
       </div>
 
       {/* Presentation Control Bar */}

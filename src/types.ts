@@ -70,6 +70,12 @@ export interface WatermarkConfig {
   showClientName: boolean;
   showTimestamp: boolean;
   showIp: boolean;
+  // Mobile Screenshot Shield & DLP properties
+  mobileScreenshotShield: boolean;
+  obscureOnAppSwitch: boolean;
+  multiTouchGestureShield: boolean;
+  dynamicFloatingPill: boolean;
+  antiCropCornerStamps: boolean;
 }
 
 export interface LoginLog {

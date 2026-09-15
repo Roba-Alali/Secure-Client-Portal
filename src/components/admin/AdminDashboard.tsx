@@ -36,6 +36,7 @@ import {
   Presentation,
   Key,
   ShieldCheck,
+  Smartphone,
   Send,
   FileCode
 } from 'lucide-react';
@@ -110,6 +111,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     company: '',
     phone: '',
     accessExpiry: '2026-12-31'
+  });
+
+  // New Project Modal state
+  const [showAddProjectModal, setShowAddProjectModal] = useState(false);
+  const [newProjectForm, setNewProjectForm] = useState({
+    title: '',
+    category: 'استراتيجية تسويقية وتواصل إعلامي',
+    description: '',
+    clientIds: [] as string[],
+    status: 'active' as 'active' | 'in-progress' | 'completed'
   });
 
   // New Document Modal state
@@ -221,6 +232,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       fileType: 'pdf',
       pageCount: 5,
       duration: '02:30'
+    });
+  };
+
+  const handleCreateProject = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProjectForm.title.trim()) return;
+
+    const assignedClients = newProjectForm.clientIds.length > 0 
+      ? newProjectForm.clientIds 
+      : (clients.length > 0 ? [clients[0].id] : []);
+
+    const newProj: Project = {
+      id: `proj-${Date.now()}`,
+      title: newProjectForm.title.trim(),
+      titleEn: newProjectForm.title.trim(),
+      category: newProjectForm.category,
+      categoryEn: newProjectForm.category,
+      description: newProjectForm.description.trim() || 'مشروع استراتيجي مخصص لعملاء MMG VIP.',
+      descriptionEn: newProjectForm.description.trim() || 'MMG VIP Strategic Dedicated Project.',
+      clientIds: assignedClients,
+      status: newProjectForm.status,
+      updatedAt: 'اليوم',
+      documentCount: {
+        pdf: 0,
+        presentation: 0,
+        video: 0
+      }
+    };
+
+    onAddProject(newProj);
+    setShowAddProjectModal(false);
+    setNewProjectForm({
+      title: '',
+      category: 'استراتيجية تسويقية وتواصل إعلامي',
+      description: '',
+      clientIds: [],
+      status: 'active'
     });
   };
 
@@ -441,9 +489,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div className="space-y-2.5">
-                {loginLogs.slice(0, 4).map((log) => (
+                {loginLogs.slice(0, 4).map((log, idx) => (
                   <div
-                    key={log.id}
+                    key={`${log.id}-${idx}`}
                     className="p-3 bg-zinc-950/80 border border-zinc-800 rounded-xl flex items-center justify-between text-xs"
                   >
                     <div>
@@ -497,9 +545,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div className="space-y-2.5">
-                {viewLogs.slice(0, 4).map((view) => (
+                {viewLogs.slice(0, 4).map((view, idx) => (
                   <div
-                    key={view.id}
+                    key={`${view.id}-${idx}`}
                     className="p-3 bg-zinc-950/80 border border-zinc-800 rounded-xl flex items-center justify-between text-xs"
                   >
                     <div className="max-w-[70%]">
@@ -625,43 +673,125 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* ======================= TAB 3: PROJECTS ======================= */}
       {activeAdminTab === 'projects' && (
-        <div className="bg-[#121216] border border-zinc-800 rounded-2xl p-6 shadow-xl space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="bg-[#121216] border border-zinc-800 rounded-2xl p-6 shadow-xl space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-zinc-800/80">
             <div>
-              <h2 className="text-lg font-bold text-white">إدارة المشاريع المخصصة</h2>
-              <p className="text-xs text-zinc-400">تنظيم المشاريع وربطها بالمستندات وتعيين العملاء المصرح لهم.</p>
+              <div className="flex items-center gap-2">
+                <FolderKanban className="w-5 h-5 text-[#E40107]" />
+                <h2 className="text-lg font-bold text-white">إدارة المشاريع المخصصة</h2>
+                <span className="text-xs font-mono bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded-full">
+                  {projects.length} مشاريع
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                تنظيم وتصنيف المشاريع، وربطها بالمستندات المحمية وتحديد صلاحيات اطلاع العملاء.
+              </p>
             </div>
+            <button
+              id="btn-add-new-project"
+              onClick={() => {
+                setNewProjectForm({
+                  title: '',
+                  category: 'استراتيجية تسويقية وتواصل إعلامي',
+                  description: '',
+                  clientIds: clients.length > 0 ? [clients[0].id] : [],
+                  status: 'active'
+                });
+                setShowAddProjectModal(true);
+              }}
+              className="px-4 py-2.5 bg-[#E40107] hover:bg-[#c90005] text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 self-start sm:self-auto shadow-lg shadow-red-950/50 hover:scale-105 active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ إضافة مشروع جديد</span>
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {projects.map((proj) => (
-              <div
-                key={proj.id}
-                className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-semibold text-[#ff4b4f] bg-[#E40107]/10 px-2 py-0.5 rounded border border-[#E40107]/20">
-                      {proj.category}
-                    </span>
-                    <span className="text-[10px] text-emerald-400 font-mono">
-                      {proj.status === 'active' ? 'نشط' : 'قيد التنفيذ'}
-                    </span>
-                  </div>
-                  <h3 className="text-sm font-bold text-white mb-1">{proj.title}</h3>
-                  <p className="text-xs text-zinc-400 mb-4">{proj.description}</p>
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {projects.map((proj) => {
+              const projDocs = documents.filter((d) => d.projectId === proj.id);
+              const assignedClientObjects = clients.filter((c) => proj.clientIds.includes(c.id));
 
-                <div className="pt-3 border-t border-zinc-800/80 text-xs text-zinc-400 flex items-center justify-between">
-                  <span className="font-mono">
-                    {documents.filter((d) => d.projectId === proj.id).length} ملفات محمية
-                  </span>
-                  <span className="text-[#ff4b4f] font-semibold">
-                    {proj.clientIds.length} عملاء مصرح لهم
-                  </span>
+              return (
+                <div
+                  key={proj.id}
+                  className="bg-zinc-950 border border-zinc-800 hover:border-zinc-700 transition-colors rounded-xl p-5 flex flex-col justify-between shadow-lg group"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <span className="text-[11px] font-semibold text-[#ff4b4f] bg-[#E40107]/10 px-2.5 py-1 rounded-lg border border-[#E40107]/20">
+                        {proj.category}
+                      </span>
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${
+                        proj.status === 'active'
+                          ? 'text-emerald-400 bg-emerald-950/40 border border-emerald-800/40'
+                          : 'text-amber-400 bg-amber-950/40 border border-amber-800/40'
+                      }`}>
+                        {proj.status === 'active' ? 'نشط' : proj.status === 'completed' ? 'مكتمل' : 'قيد التنفيذ'}
+                      </span>
+                    </div>
+
+                    <h3 className="text-base font-bold text-white mb-1.5 group-hover:text-red-400 transition-colors">
+                      {proj.title}
+                    </h3>
+                    <p className="text-xs text-zinc-400 line-clamp-2 mb-4 leading-relaxed">
+                      {proj.description}
+                    </p>
+
+                    {/* Assigned Clients Preview */}
+                    <div className="mb-4 bg-[#121216] p-2.5 rounded-lg border border-zinc-800/80">
+                      <div className="text-[10px] font-semibold text-zinc-400 mb-1.5 flex items-center justify-between">
+                        <span>العملاء المصرح لهم:</span>
+                        <span className="text-zinc-500 font-mono">({proj.clientIds.length})</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {assignedClientObjects.length > 0 ? (
+                          assignedClientObjects.map((c) => (
+                            <span
+                              key={c.id}
+                              className="text-[10px] bg-zinc-900 text-zinc-300 px-2 py-0.5 rounded border border-zinc-800 truncate max-w-[140px]"
+                              title={`${c.name} (${c.company})`}
+                            >
+                              {c.company || c.name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[10px] text-zinc-500 italic">لا يوجد عملاء مخصصين حالياً</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="pt-3 border-t border-zinc-800/80 text-xs text-zinc-400 flex items-center justify-between mb-3">
+                      <span className="font-mono text-zinc-300">
+                        {projDocs.length} ملفات محمية
+                      </span>
+                      <span className="text-[11px] text-zinc-500 font-mono">
+                        تحديث: {proj.updatedAt}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setNewDocForm({
+                          projectId: proj.id,
+                          title: '',
+                          description: '',
+                          fileType: 'pdf',
+                          pageCount: 5,
+                          duration: '02:30'
+                        });
+                        setShowAddDocModal(true);
+                      }}
+                      className="w-full py-2 bg-zinc-900 hover:bg-[#E40107]/20 hover:text-[#ff4b4f] hover:border-[#E40107]/40 text-zinc-300 rounded-lg text-xs font-semibold border border-zinc-800 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-[#E40107]" />
+                      <span>رفع مستند لهذا المشروع</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -849,8 +979,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800 font-mono">
-                {loginLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-zinc-800/40 transition-colors">
+                {loginLogs.map((log, idx) => (
+                  <tr key={`${log.id}-${idx}`} className="hover:bg-zinc-800/40 transition-colors">
                     <td className="p-3 font-sans font-bold text-white">
                       {log.clientName}
                     </td>
@@ -913,8 +1043,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800">
-                {viewLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-zinc-800/40 transition-colors">
+                {viewLogs.map((log, idx) => (
+                  <tr key={`${log.id}-${idx}`} className="hover:bg-zinc-800/40 transition-colors">
                     <td className="p-3 font-bold text-white">
                       {log.documentTitle}
                     </td>
@@ -963,9 +1093,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           <div className="space-y-3">
-            {notifications.map((notif) => (
+            {notifications.map((notif, idx) => (
               <div
-                key={notif.id}
+                key={`${notif.id}-${idx}`}
                 className={`p-4 rounded-xl border flex items-start justify-between gap-4 ${
                   notif.type === 'security'
                     ? 'bg-rose-500/10 border-rose-500/20'
@@ -1122,15 +1252,60 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 pt-2">
+              <div className="space-y-2 pt-3 border-t border-zinc-800">
+                <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5 mb-2">
+                  <Smartphone className="w-4 h-4" />
+                  <span>إعدادات درع حماية الهاتف من لقطات الشاشة (Mobile Screenshot Shield):</span>
+                </div>
+
                 <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={localWm.mobileScreenshotShield !== false}
+                    onChange={(e) => setLocalWm({ ...localWm, mobileScreenshotShield: e.target.checked })}
+                    className="rounded accent-[#E40107]"
+                  />
+                  <span className="font-semibold text-white">تفعيل درع حماية الهاتف الذكي من التقاط الشاشة</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={localWm.obscureOnAppSwitch !== false}
+                    onChange={(e) => setLocalWm({ ...localWm, obscureOnAppSwitch: e.target.checked })}
+                    className="rounded accent-[#E40107]"
+                  />
+                  <span>التعتيم التلقائي الفوري عند تبديل التطبيق أو ضغط أزرار الهاتف</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={localWm.multiTouchGestureShield !== false}
+                    onChange={(e) => setLocalWm({ ...localWm, multiTouchGestureShield: e.target.checked })}
+                    className="rounded accent-[#E40107]"
+                  />
+                  <span>حظر إيماءات اللمس المتعدد (سحب 3 أصابع لتصوير الشاشة على أندرويد)</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={localWm.dynamicFloatingPill !== false}
+                    onChange={(e) => setLocalWm({ ...localWm, dynamicFloatingPill: e.target.checked })}
+                    className="rounded accent-[#E40107]"
+                  />
+                  <span>الشارة المائية العائمة المتحركة ضد القص (Anti-Crop Floating Pill)</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={localWm.driftAnimation}
                     onChange={(e) => setLocalWm({ ...localWm, driftAnimation: e.target.checked })}
                     className="rounded accent-[#E40107]"
                   />
-                  <span>تفعيل النبض الديناميكي (Drift Pulse) لمكافحة برامج تصوير الشاشة</span>
+                  <span>تفعيل النبض الديناميكي للعلامة المائية (Drift Pulse)</span>
                 </label>
               </div>
             </div>
@@ -1378,6 +1553,140 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   className="flex-1 bg-[#E40107] hover:bg-[#c90005] text-white font-bold py-2.5 rounded-xl transition-colors shadow-lg shadow-red-950/40"
                 >
                   تأكيد الإضافة
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD PROJECT */}
+      {showAddProjectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#121216] border border-zinc-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <FolderKanban className="w-5 h-5 text-[#E40107]" />
+                <h3 className="text-base font-bold text-white">إضافة مشروع مخصص جديد</h3>
+              </div>
+              <button
+                onClick={() => setShowAddProjectModal(false)}
+                className="text-zinc-500 hover:text-white p-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateProject} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-zinc-300 mb-1 font-semibold">
+                  اسم المشروع <span className="text-[#E40107]">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newProjectForm.title}
+                  onChange={(e) => setNewProjectForm({ ...newProjectForm, title: e.target.value })}
+                  placeholder="مثال: حملة الهوية البصرية 2026 وإطلاق العلامة التجارية"
+                  className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-[#E40107]"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-zinc-300 mb-1 font-semibold">تصنيف المشروع</label>
+                  <select
+                    value={newProjectForm.category}
+                    onChange={(e) => setNewProjectForm({ ...newProjectForm, category: e.target.value })}
+                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-[#E40107]"
+                  >
+                    <option value="استراتيجية تسويقية وتواصل إعلامي">استراتيجية تسويقية وتواصل إعلامي</option>
+                    <option value="إنتاج إعلاني ومحتوى مرئي">إنتاج إعلاني ومحتوى مرئي</option>
+                    <option value="تطوير هوية بصرية وبراندينج">تطوير هوية بصرية وبراندينج</option>
+                    <option value="حملات رقمية وعلاقات عامة">حملات رقمية وعلاقات عامة</option>
+                    <option value="شراكات استثمارية واستشارات">شراكات استثمارية واستشارات</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-zinc-300 mb-1 font-semibold">حالة المشروع</label>
+                  <select
+                    value={newProjectForm.status}
+                    onChange={(e) => setNewProjectForm({ ...newProjectForm, status: e.target.value as any })}
+                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-[#E40107]"
+                  >
+                    <option value="active">نشط (Active)</option>
+                    <option value="in-progress">قيد التنفيذ (In Progress)</option>
+                    <option value="completed">مكتمل (Completed)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-zinc-300 mb-1 font-semibold">وصف المشروع ونطاق العمل</label>
+                <textarea
+                  rows={2}
+                  value={newProjectForm.description}
+                  onChange={(e) => setNewProjectForm({ ...newProjectForm, description: e.target.value })}
+                  placeholder="وصف مختصر للأهداف، المستندات المرتبطة، والجهات المعنية..."
+                  className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-[#E40107]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-zinc-300 mb-1.5 font-semibold">
+                  تحديد العملاء المصرح لهم بالاطلاع على هذا المشروع:
+                </label>
+                <div className="bg-[#09090b] border border-zinc-800 rounded-xl p-3 max-h-36 overflow-y-auto space-y-2">
+                  {clients.map((c) => {
+                    const isChecked = newProjectForm.clientIds.includes(c.id);
+                    return (
+                      <label
+                        key={c.id}
+                        className="flex items-center gap-2 text-zinc-300 hover:text-white cursor-pointer select-none"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setNewProjectForm({
+                                ...newProjectForm,
+                                clientIds: [...newProjectForm.clientIds, c.id]
+                              });
+                            } else {
+                              setNewProjectForm({
+                                ...newProjectForm,
+                                clientIds: newProjectForm.clientIds.filter((id) => id !== c.id)
+                              });
+                            }
+                          }}
+                          className="rounded accent-[#E40107]"
+                        />
+                        <span className="font-medium">{c.name}</span>
+                        <span className="text-zinc-500 text-[11px]">({c.company})</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-zinc-500 mt-1">
+                  * سيتمكن العملاء المحدّدون فقط من رؤية المستندات المندرجة تحت هذا المشروع في بوابتهم.
+                </p>
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddProjectModal(false)}
+                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2.5 rounded-xl font-medium transition-colors"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-[#E40107] hover:bg-[#c90005] text-white font-bold py-2.5 rounded-xl transition-colors shadow-lg shadow-red-950/40"
+                >
+                  إنشاء المشروع
                 </button>
               </div>
             </form>

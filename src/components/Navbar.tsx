@@ -41,23 +41,37 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="sticky top-0 z-40 bg-[#0c0c0e]/95 backdrop-blur-md border-b border-zinc-800/80 px-4 lg:px-8 py-2.5">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-        {/* MMG Brand & VIP Portal Indicator */}
+        {/* MMG Official Logo & VIP Portal Indicator */}
         <div className="flex items-center gap-3.5">
-          <div className="flex items-center gap-2.5">
-            <MmgLogo size="sm" variant="icon" />
-            <div className="hidden sm:block">
+          <div className="flex items-center gap-3">
+            <a
+              href="https://mmglobal.vip"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Modern Media Global (mmglobal.vip)"
+              className="flex items-center transition-transform hover:scale-[1.02]"
+            >
+              <MmgLogo size="sm" variant="official_image" />
+            </a>
+            <div>
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-white text-base tracking-tight font-sans">
                   MMG
                 </span>
-                <span className="text-[11px] font-bold text-zinc-300 uppercase tracking-widest hidden md:inline">
-                  Modern Media Global
+                <span className="text-[10px] bg-[#E40107] text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shadow-sm shadow-red-950/60">
+                  VIP
                 </span>
-                <span className="text-[10px] bg-[#E40107]/15 text-[#ff4b4f] px-2 py-0.5 rounded border border-[#E40107]/30 font-bold tracking-wider">
-                  VIP PORTAL
-                </span>
+                <a
+                  href="https://mmglobal.vip"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hidden sm:inline-flex items-center gap-1 text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
+                >
+                  <span>mmglobal.vip</span>
+                  <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+                </a>
               </div>
-              <p className="text-[11px] text-zinc-400 truncate">
+              <p className="text-[11px] text-zinc-400 truncate max-w-[180px] sm:max-w-none">
                 {currentRole === 'admin'
                   ? 'لوحة إدارة النظام وحماية مستندات MMG'
                   : `بوابة العميل المعتمد: ${currentClient?.company || 'العميل'}`}
@@ -167,9 +181,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span className="text-[10px] text-emerald-400 font-mono">Real-Time Active</span>
                 </div>
                 <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                  {notifications.slice(0, 5).map((n) => (
+                  {notifications.slice(0, 5).map((n, idx) => (
                     <div
-                      key={n.id}
+                      key={`${n.id}-${idx}`}
                       className="p-2 bg-zinc-950 rounded-lg border border-zinc-800/80 text-[11px]"
                     >
                       <div className="font-bold text-zinc-200">{n.title}</div>

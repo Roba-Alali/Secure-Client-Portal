@@ -1,76 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface MmgLogoProps {
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  variant?: 'full' | 'icon' | 'badge' | 'minimal';
+  variant?: 'full' | 'icon' | 'badge' | 'minimal' | 'official_image';
   showTagline?: boolean;
   className?: string;
 }
-
-export const MmgEmblemSvg: React.FC<{ className?: string }> = ({ className = 'w-10 h-10' }) => (
-  <svg
-    viewBox="0 0 100 100"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    className={`${className} drop-shadow-[0_4px_12px_rgba(228,1,7,0.35)] shrink-0 transition-transform`}
-  >
-    <defs>
-      {/* Top Facet - High Intensity Crimson */}
-      <linearGradient id="mmg-facet-top" x1="18" y1="14" x2="82" y2="48" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stopColor="#ff4b4f" />
-        <stop offset="100%" stopColor="#E40107" />
-      </linearGradient>
-      {/* Left Front Facet - Deep Ruby */}
-      <linearGradient id="mmg-facet-left" x1="18" y1="32" x2="50" y2="88" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stopColor="#E40107" />
-        <stop offset="100%" stopColor="#b80005" />
-      </linearGradient>
-      {/* Right Front Facet - Shadow Wine */}
-      <linearGradient id="mmg-facet-right" x1="50" y1="48" x2="82" y2="88" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stopColor="#b80005" />
-        <stop offset="100%" stopColor="#7a0004" />
-      </linearGradient>
-      {/* Specular Edge Glow */}
-      <linearGradient id="mmg-edge-glow" x1="50" y1="14" x2="50" y2="88" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stopColor="#ffffff" stopOpacity="0.4" />
-        <stop offset="50%" stopColor="#ffffff" stopOpacity="0.1" />
-        <stop offset="100%" stopColor="#ff4b4f" stopOpacity="0" />
-      </linearGradient>
-    </defs>
-
-    {/* Facet 1: Top Diamond */}
-    <path
-      d="M50 14 L84 33 L50 50 L16 33 Z"
-      fill="url(#mmg-facet-top)"
-      stroke="rgba(255,255,255,0.25)"
-      strokeWidth="1.2"
-      strokeLinejoin="round"
-    />
-    {/* Facet 2: Left Side */}
-    <path
-      d="M16 33 L50 50 L50 88 L16 70 Z"
-      fill="url(#mmg-facet-left)"
-      stroke="rgba(255,255,255,0.15)"
-      strokeWidth="1.2"
-      strokeLinejoin="round"
-    />
-    {/* Facet 3: Right Side */}
-    <path
-      d="M50 50 L84 33 L84 70 L50 88 Z"
-      fill="url(#mmg-facet-right)"
-      stroke="rgba(255,255,255,0.15)"
-      strokeWidth="1.2"
-      strokeLinejoin="round"
-    />
-    {/* Central Ridge Highlight */}
-    <path
-      d="M50 14 L50 88"
-      stroke="url(#mmg-edge-glow)"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-    />
-  </svg>
-);
 
 export const MmgLogo: React.FC<MmgLogoProps> = ({
   size = 'md',
@@ -78,7 +13,18 @@ export const MmgLogo: React.FC<MmgLogoProps> = ({
   showTagline = false,
   className = ''
 }) => {
-  // Size mapping
+  const [imgError, setImgError] = useState(false);
+  const [iconError, setIconError] = useState(false);
+
+  // Height and scale mappings for actual official logo
+  const logoHeights = {
+    xs: 'h-6',
+    sm: 'h-8',
+    md: 'h-10 sm:h-11',
+    lg: 'h-14 sm:h-16',
+    xl: 'h-20 sm:h-24'
+  }[size];
+
   const iconSizes = {
     xs: 'w-6 h-6',
     sm: 'w-8 h-8',
@@ -90,9 +36,9 @@ export const MmgLogo: React.FC<MmgLogoProps> = ({
   const titleSizes = {
     xs: 'text-xs',
     sm: 'text-sm',
-    md: 'text-lg',
-    lg: 'text-2xl',
-    xl: 'text-3xl'
+    md: 'text-base sm:text-lg',
+    lg: 'text-xl sm:text-2xl',
+    xl: 'text-2xl sm:text-3xl'
   }[size];
 
   const subSizes = {
@@ -103,27 +49,60 @@ export const MmgLogo: React.FC<MmgLogoProps> = ({
     xl: 'text-base'
   }[size];
 
+  // 1. Standalone Icon Variant (Used in compact headers, tabs, navigation)
   if (variant === 'icon') {
     return (
-      <div className={`inline-flex items-center justify-center ${className}`}>
-        <MmgEmblemSvg className={iconSizes} />
+      <div className={`inline-flex items-center justify-center shrink-0 p-1 rounded-lg bg-white/95 border border-zinc-300 shadow-sm ${className}`}>
+        <img
+          src="/images/mmg-logo.png"
+          alt="MMG Logo"
+          className={`${iconSizes} object-contain`}
+          referrerPolicy="no-referrer"
+          onError={() => setIconError(true)}
+        />
       </div>
     );
   }
 
-  return (
-    <div className={`flex items-center gap-3 select-none ${className}`}>
-      {/* 3D Polyhedron MMG Mark */}
-      <MmgEmblemSvg className={iconSizes} />
+  // 2. Pure Official Logo Image (Full high-res logo from mmglobal.vip)
+  if (variant === 'official_image') {
+    return (
+      <div className={`flex items-center justify-center p-2 rounded-2xl bg-white/95 border border-zinc-300 shadow-md ${className}`}>
+        <img
+          src="/images/mmg-logo.png"
+          alt="Modern Media Global - mmglobal.vip Official Logo"
+          className={`${logoHeights} w-auto object-contain transition-all`}
+          referrerPolicy="no-referrer"
+        />
+      </div>
+    );
+  }
 
-      {/* Typography block */}
+  // 3. Full Brand Variant (Official Logo Image + VIP Portal typography & verified badge)
+  return (
+    <div className={`flex items-center gap-3.5 select-none ${className}`}>
+      {/* The Actual Official mmglobal.vip Logo Image with Crisp Backdrop */}
+      <div className="relative shrink-0 flex items-center justify-center px-2.5 py-1.5 rounded-xl bg-white/95 border border-zinc-300 shadow-md">
+        <img
+          src="/images/mmg-logo.png"
+          alt="Modern Media Global Official Logo"
+          className={`${logoHeights} w-auto max-w-[150px] sm:max-w-[200px] object-contain transition-transform hover:scale-105`}
+          referrerPolicy="no-referrer"
+          onError={() => setImgError(true)}
+        />
+      </div>
+
+      {/* Brand & Portal Identifiers */}
       <div className="flex flex-col text-right">
         <div className="flex items-center gap-2">
           <span className={`font-black text-white tracking-tight font-sans ${titleSizes}`}>
             MMG
           </span>
-          <span className="text-[10px] bg-[#E40107] text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shadow-sm shadow-red-950">
+          <span className="text-[10px] bg-[#E40107] text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shadow-sm shadow-red-950/60">
             VIP
+          </span>
+          <span className="hidden sm:inline-block text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+            mmglobal.vip
           </span>
         </div>
 
@@ -134,7 +113,7 @@ export const MmgLogo: React.FC<MmgLogoProps> = ({
         </div>
 
         {(variant === 'badge' || showTagline) && (
-          <span className="text-[10px] text-zinc-400 font-medium tracking-tight mt-0.5">
+          <span className="text-[10px] text-zinc-400 font-medium tracking-tight mt-0.5 max-w-xs truncate">
             Strategic Marketing Communication Holding Company
           </span>
         )}

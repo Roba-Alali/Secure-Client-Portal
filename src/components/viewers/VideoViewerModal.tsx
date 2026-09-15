@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { DocumentItem, ClientUser, WatermarkConfig, ViewLog, AdminNotification } from '../../types';
 import { WatermarkOverlay } from '../WatermarkOverlay';
 import { MmgLogo } from '../MmgLogo';
+import { MobileScreenshotShield } from '../MobileScreenshotShield';
 import {
   X,
   Play,
@@ -38,50 +39,57 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
   const [secondsSpent, setSecondsSpent] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  const hasRecordedInitialView = useRef(false);
+
   useEffect(() => {
     const timer = setInterval(() => {
       setSecondsSpent((prev) => prev + 1);
     }, 1000);
 
-    const alertNotif: AdminNotification = {
-      id: `notif-${Date.now()}`,
-      title: 'مشاهدة فيديو إعلامي محمي لـ MMG',
-      titleEn: 'Protected Video Stream Opened',
-      message: `بدأ العميل ${client.name} مشاهدة البث المحمي: "${document.title}".`,
-      messageEn: `Client ${client.name} began streaming protected video "${document.title}".`,
-      type: 'view',
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      read: false,
-      metadata: {
+    if (!hasRecordedInitialView.current) {
+      hasRecordedInitialView.current = true;
+      const uniqueSuffix = Math.random().toString(36).substring(2, 9);
+      const alertNotif: AdminNotification = {
+        id: `notif-${Date.now()}-${uniqueSuffix}`,
+        title: 'مشاهدة فيديو إعلامي محمي لـ MMG',
+        titleEn: 'Protected Video Stream Opened',
+        message: `بدأ العميل ${client.name} مشاهدة البث المحمي: "${document.title}".`,
+        messageEn: `Client ${client.name} began streaming protected video "${document.title}".`,
+        type: 'view',
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        read: false,
+        metadata: {
+          clientId: client.id,
+          documentId: document.id
+        }
+      };
+
+      const initialLog: ViewLog = {
+        id: `view-${Date.now()}-${uniqueSuffix}`,
+        documentId: document.id,
+        documentTitle: document.title,
+        fileType: 'video',
         clientId: client.id,
-        documentId: document.id
-      }
-    };
+        clientName: client.name,
+        clientEmail: client.email,
+        ipAddress: client.ipAddress || '197.34.12.88',
+        durationSeconds: 1,
+        pagesViewed: 1,
+        maxPageReached: 1,
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        watermarkApplied: `${client.email} | ${client.ipAddress || '197.34.12.88'}`
+      };
 
-    const initialLog: ViewLog = {
-      id: `view-${Date.now()}`,
-      documentId: document.id,
-      documentTitle: document.title,
-      fileType: 'video',
-      clientId: client.id,
-      clientName: client.name,
-      clientEmail: client.email,
-      ipAddress: client.ipAddress || '197.34.12.88',
-      durationSeconds: 1,
-      pagesViewed: 1,
-      maxPageReached: 1,
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      watermarkApplied: `${client.email} | ${client.ipAddress || '197.34.12.88'}`
-    };
-
-    onRecordView(initialLog, alertNotif);
+      onRecordView(initialLog, alertNotif);
+    }
 
     return () => clearInterval(timer);
   }, []);
 
   const handleClose = () => {
+    const uniqueSuffix = Math.random().toString(36).substring(2, 9);
     const finalLog: ViewLog = {
-      id: `view-${Date.now()}`,
+      id: `view-${Date.now()}-${uniqueSuffix}`,
       documentId: document.id,
       documentTitle: document.title,
       fileType: 'video',
@@ -163,9 +171,17 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
         </div>
       </div>
 
-      {/* Video Stage with Dynamic Drift Watermark */}
-      <div className="flex-1 flex items-center justify-center p-4 md:p-8 relative overflow-hidden bg-[#09090b]">
-        <div className="relative w-full max-w-4xl aspect-video bg-black rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden group">
+      {/* Video Stage with Dynamic Drift Watermark and Mobile Screenshot Shield */}
+      <div className="flex-1 relative overflow-hidden bg-[#09090b]/90">
+        <MobileScreenshotShield
+          clientName={client.name}
+          clientEmail={client.email}
+          clientIp={client.ipAddress || '197.34.12.88'}
+          documentTitle={document.title}
+          enabled={watermarkConfig.mobileScreenshotShield !== false}
+        >
+          <div className="w-full h-full flex items-center justify-center p-4 md:p-8 overflow-auto">
+            <div className="relative w-full max-w-4xl aspect-video bg-black rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden group">
           {/* Dynamic Watermark Layer */}
           <WatermarkOverlay
             config={watermarkConfig}
@@ -253,6 +269,8 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </MobileScreenshotShield>
+  </div>
+</div>
   );
 };
