@@ -1,18 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DocumentItem, ClientUser, WatermarkConfig, ViewLog, AdminNotification } from '../../types';
 import { WatermarkOverlay } from '../WatermarkOverlay';
+import { MmgLogo } from '../MmgLogo';
 import {
   X,
   Play,
   Pause,
   Volume2,
   VolumeX,
-  Maximize,
+  Maximize2,
+  ShieldCheck,
   Lock,
   Clock,
   Video,
-  ShieldCheck,
-  AlertCircle
+  AlertTriangle
 } from 'lucide-react';
 
 interface VideoViewerModalProps {
@@ -31,9 +32,9 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
   onRecordView
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [totalDuration, setTotalDuration] = useState(90); // default seconds
+  const [totalDuration, setTotalDuration] = useState(90);
+  const [isMuted, setIsMuted] = useState(false);
   const [secondsSpent, setSecondsSpent] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -44,9 +45,9 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
 
     const alertNotif: AdminNotification = {
       id: `notif-${Date.now()}`,
-      title: 'مشاهدة فيديو تدريبي محمي',
-      titleEn: 'Protected Video Streamed',
-      message: `بدأ العميل ${client.name} مشاهدة المقطع المرئي المحمي: "${document.title}".`,
+      title: 'مشاهدة فيديو إعلامي محمي لـ MMG',
+      titleEn: 'Protected Video Stream Opened',
+      message: `بدأ العميل ${client.name} مشاهدة البث المحمي: "${document.title}".`,
       messageEn: `Client ${client.name} began streaming protected video "${document.title}".`,
       type: 'view',
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
@@ -67,6 +68,8 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
       clientEmail: client.email,
       ipAddress: client.ipAddress || '197.34.12.88',
       durationSeconds: 1,
+      pagesViewed: 1,
+      maxPageReached: 1,
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
       watermarkApplied: `${client.email} | ${client.ipAddress || '197.34.12.88'}`
     };
@@ -87,6 +90,8 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
       clientEmail: client.email,
       ipAddress: client.ipAddress || '197.34.12.88',
       durationSeconds: secondsSpent,
+      pagesViewed: 1,
+      maxPageReached: 1,
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
       watermarkApplied: `${client.email} | ${client.ipAddress || '197.34.12.88'}`
     };
@@ -123,37 +128,35 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
   return (
     <div
       id="video-viewer-modal"
-      className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-slate-100 select-none"
+      className="fixed inset-0 z-50 flex flex-col bg-[#09090b] text-zinc-100 select-none"
       onContextMenu={(e) => e.preventDefault()}
     >
       {/* Top Bar */}
-      <div className="h-16 border-b border-slate-800 bg-slate-900/90 px-4 md:px-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
-            <Video className="w-5 h-5" />
-          </div>
+      <div className="h-16 border-b border-zinc-800 bg-[#0c0c0e]/95 px-4 md:px-6 flex items-center justify-between">
+        <div className="flex items-center gap-3.5">
+          <MmgLogo size="sm" variant="icon" />
           <div>
             <h2 className="text-sm md:text-base font-bold text-white flex items-center gap-2">
               {document.title}
-              <span className="bg-emerald-500/10 text-emerald-400 text-xs px-2 py-0.5 rounded border border-emerald-500/20 flex items-center gap-1">
-                <Lock className="w-3 h-3" /> فيديو مشفر
+              <span className="bg-[#E40107]/15 text-[#ff4b4f] text-xs px-2 py-0.5 rounded border border-[#E40107]/30 flex items-center gap-1 font-semibold">
+                <Lock className="w-3 h-3" /> MMG VIP مشفر
               </span>
             </h2>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-zinc-400">
               مدة البث: {document.duration || '01:30'} • {client.company}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-xs font-mono bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-lg border border-emerald-500/20">
+          <div className="flex items-center gap-2 text-xs font-mono bg-[#E40107]/10 text-[#ff4b4f] px-3 py-1.5 rounded-xl border border-[#E40107]/20">
             <Clock className="w-3.5 h-3.5" />
             <span>{Math.floor(secondsSpent / 60)}:{(secondsSpent % 60).toString().padStart(2, '0')}</span>
           </div>
 
           <button
             onClick={handleClose}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 border border-slate-700 transition-colors"
+            className="p-2 rounded-xl bg-zinc-900 hover:bg-[#E40107]/20 hover:text-[#ff4b4f] text-zinc-400 border border-zinc-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -161,8 +164,8 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
       </div>
 
       {/* Video Stage with Dynamic Drift Watermark */}
-      <div className="flex-1 flex items-center justify-center p-4 md:p-8 relative overflow-hidden bg-slate-950">
-        <div className="relative w-full max-w-4xl aspect-video bg-black rounded-2xl border border-slate-800 shadow-2xl overflow-hidden group">
+      <div className="flex-1 flex items-center justify-center p-4 md:p-8 relative overflow-hidden bg-[#09090b]">
+        <div className="relative w-full max-w-4xl aspect-video bg-black rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden group">
           {/* Dynamic Watermark Layer */}
           <WatermarkOverlay
             config={watermarkConfig}
@@ -173,9 +176,9 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
           />
 
           {/* Floating Drift Watermark Pill (prevents corner cropping) */}
-          <div className="absolute top-4 right-4 z-40 bg-slate-900/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-xs font-mono text-emerald-400 font-bold flex items-center gap-2 pointer-events-none">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            <span>{client.email} • {client.ipAddress || '197.34.12.88'}</span>
+          <div className="absolute top-4 right-4 z-40 bg-zinc-950/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-[#E40107]/30 text-xs font-mono text-[#ff4b4f] font-bold flex items-center gap-2 pointer-events-none shadow-lg">
+            <span className="w-2 h-2 rounded-full bg-[#E40107] animate-ping" />
+            <span>MMG VIP • {client.email} • {client.ipAddress || '197.34.12.88'}</span>
           </div>
 
           <video
@@ -192,17 +195,17 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
           {!isPlaying && (
             <button
               onClick={togglePlay}
-              className="absolute inset-0 m-auto w-20 h-20 rounded-full bg-emerald-500/90 hover:bg-emerald-400 text-slate-950 flex items-center justify-center shadow-2xl transition-all transform hover:scale-105 z-30"
+              className="absolute inset-0 m-auto w-20 h-20 rounded-full bg-[#E40107] hover:bg-[#c90005] text-white flex items-center justify-center shadow-2xl shadow-red-950/80 transition-all transform hover:scale-105 z-30 border border-red-400/40"
             >
               <Play className="w-8 h-8 fill-current ml-1" />
             </button>
           )}
 
           {/* Bottom Video Controls Overlay */}
-          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent p-4 z-40">
+          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-[#09090b] via-[#09090b]/80 to-transparent p-4 z-40">
             {/* Progress Bar */}
             <div
-              className="w-full h-1.5 bg-slate-700/60 rounded-full mb-3 cursor-pointer overflow-hidden"
+              className="w-full h-1.5 bg-zinc-800 rounded-full mb-3 cursor-pointer overflow-hidden"
               onClick={(e) => {
                 if (!videoRef.current) return;
                 const rect = e.currentTarget.getBoundingClientRect();
@@ -211,16 +214,16 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
               }}
             >
               <div
-                className="h-full bg-emerald-500 transition-all"
+                className="h-full bg-[#E40107] transition-all"
                 style={{ width: `${(currentTime / totalDuration) * 100}%` }}
               />
             </div>
 
-            <div className="flex items-center justify-between text-xs text-slate-300">
+            <div className="flex items-center justify-between text-xs text-zinc-300">
               <div className="flex items-center gap-4">
                 <button
                   onClick={togglePlay}
-                  className="p-1.5 rounded hover:bg-white/10 transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
                 >
                   {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                 </button>
@@ -232,19 +235,19 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
                       setIsMuted(!isMuted);
                     }
                   }}
-                  className="p-1.5 rounded hover:bg-white/10 transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
                 >
                   {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                 </button>
 
-                <span className="font-mono text-[11px]">
+                <span className="font-mono text-[11px] text-zinc-400">
                   {formatTime(currentTime)} / {formatTime(totalDuration)}
                 </span>
               </div>
 
-              <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                <span>مشغل فيديو محمي • يمنع التحميل</span>
+              <div className="flex items-center gap-2 text-[11px] text-zinc-400">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#E40107]" />
+                <span>مشغل وسائط MMG المحمي • تشفير البث المباشر</span>
               </div>
             </div>
           </div>

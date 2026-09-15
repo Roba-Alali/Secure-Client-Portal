@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DocumentItem, ClientUser, WatermarkConfig, ViewLog, AdminNotification } from '../../types';
 import { WatermarkOverlay } from '../WatermarkOverlay';
+import { MmgLogo } from '../MmgLogo';
 import {
   X,
   ChevronRight,
@@ -34,7 +35,7 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
     {
       title: document.title,
       subtitle: document.description,
-      content: ['الهدف الاستراتيجي الأول', 'مؤشرات التنفيذ والأداء', 'المعالم الزمنية المستهدفة']
+      content: ['الهدف الاستراتيجي الأول لـ MMG', 'مؤشرات التنفيذ والأداء الإعلامي', 'المعالم الزمنية المستهدفة للحملة']
     }
   ];
 
@@ -47,7 +48,7 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
 
     const alertNotif: AdminNotification = {
       id: `notif-${Date.now()}`,
-      title: 'استعراض عرض تقديمي محمي',
+      title: 'استعراض عرض تقديمي محمي لـ MMG',
       titleEn: 'Protected Presentation Viewed',
       message: `بدأ العميل ${client.name} استعراض شرائح العرض التقديمي: "${document.title}".`,
       messageEn: `Client ${client.name} opened presentation deck "${document.title}".`,
@@ -106,37 +107,35 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
   return (
     <div
       id="presentation-viewer-modal"
-      className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-slate-100 select-none"
+      className="fixed inset-0 z-50 flex flex-col bg-[#09090b] text-zinc-100 select-none"
       onContextMenu={(e) => e.preventDefault()}
     >
       {/* Header */}
-      <div className="h-16 border-b border-slate-800 bg-slate-900/90 px-4 md:px-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center">
-            <Presentation className="w-5 h-5" />
-          </div>
+      <div className="h-16 border-b border-zinc-800 bg-[#0c0c0e]/95 px-4 md:px-6 flex items-center justify-between">
+        <div className="flex items-center gap-3.5">
+          <MmgLogo size="sm" variant="icon" />
           <div>
             <h2 className="text-sm md:text-base font-bold text-white flex items-center gap-2">
               {document.title}
-              <span className="bg-indigo-500/10 text-indigo-400 text-xs px-2 py-0.5 rounded border border-indigo-500/20 flex items-center gap-1">
-                <Lock className="w-3 h-3" /> محمي
+              <span className="bg-[#E40107]/15 text-[#ff4b4f] text-xs px-2 py-0.5 rounded border border-[#E40107]/30 flex items-center gap-1 font-semibold">
+                <Lock className="w-3 h-3" /> MMG VIP محمي
               </span>
             </h2>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-zinc-400">
               شريحة {currentSlide + 1} من {totalSlides} • {client.company}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-xs font-mono bg-indigo-500/10 text-indigo-400 px-3 py-1.5 rounded-lg border border-indigo-500/20">
+          <div className="flex items-center gap-2 text-xs font-mono bg-[#E40107]/10 text-[#ff4b4f] px-3 py-1.5 rounded-xl border border-[#E40107]/20">
             <Clock className="w-3.5 h-3.5" />
             <span>{Math.floor(secondsSpent / 60)}:{(secondsSpent % 60).toString().padStart(2, '0')}</span>
           </div>
 
           <button
             onClick={handleClose}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 border border-slate-700 transition-colors"
+            className="p-2 rounded-xl bg-zinc-900 hover:bg-[#E40107]/20 hover:text-[#ff4b4f] text-zinc-400 border border-zinc-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -144,8 +143,8 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
       </div>
 
       {/* Main Slide Presentation Stage */}
-      <div className="flex-1 flex items-center justify-center p-4 md:p-10 relative overflow-hidden bg-slate-900/50">
-        <div className="relative w-full max-w-4xl aspect-[16/10] bg-slate-900 rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden flex flex-col justify-between p-8 md:p-12">
+      <div className="flex-1 flex items-center justify-center p-4 md:p-10 relative overflow-hidden bg-[#09090b]/80">
+        <div className="relative w-full max-w-4xl aspect-[16/10] bg-[#121216] rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden flex flex-col justify-between p-8 md:p-12">
           {/* Dynamic Watermark Overlay */}
           <WatermarkOverlay
             config={watermarkConfig}
@@ -156,44 +155,44 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
           />
 
           {/* Slide Top Banner */}
-          <div className="flex justify-between items-center border-b border-slate-800 pb-4">
-            <div className="flex items-center gap-2 text-xs text-indigo-400 font-bold uppercase tracking-wider">
-              <PieChart className="w-4 h-4" />
-              <span>PRESENTATION SLIDE {currentSlide + 1}</span>
+          <div className="flex justify-between items-center border-b border-zinc-800 pb-4">
+            <div className="flex items-center gap-2 text-xs text-[#ff4b4f] font-bold uppercase tracking-wider">
+              <PieChart className="w-4 h-4 text-[#E40107]" />
+              <span>MMG PRESENTATION • SLIDE {currentSlide + 1}</span>
             </div>
-            <div className="text-xs font-mono text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded">
+            <div className="text-xs font-mono text-zinc-300 bg-zinc-950 px-2.5 py-1 rounded-lg border border-zinc-800">
               {client.email}
             </div>
           </div>
 
           {/* Slide Body */}
           <div className="my-auto py-6">
-            <h1 className="text-2xl md:text-3xl font-black text-white mb-2 leading-relaxed">
+            <h1 className="text-2xl md:text-3xl font-black text-white mb-2 leading-relaxed font-sans">
               {currentSlideData.title}
             </h1>
-            <p className="text-base text-slate-300 mb-8 font-medium">
+            <p className="text-base text-zinc-300 mb-8 font-medium">
               {currentSlideData.subtitle}
             </p>
 
             <div className="space-y-3">
               {currentSlideData.content.map((point, idx) => (
-                <div key={idx} className="flex items-start gap-3 bg-slate-800/40 p-3.5 rounded-xl border border-slate-700/50">
-                  <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                <div key={idx} className="flex items-start gap-3 bg-zinc-950/70 p-3.5 rounded-xl border border-zinc-800/80">
+                  <div className="w-6 h-6 rounded-full bg-[#E40107]/20 text-[#ff4b4f] flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 border border-[#E40107]/30">
                     {idx + 1}
                   </div>
-                  <span className="text-slate-200 text-sm md:text-base font-medium">{point}</span>
+                  <span className="text-zinc-200 text-sm md:text-base font-medium">{point}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Slide Footer */}
-          <div className="flex justify-between items-center pt-4 border-t border-slate-800 text-xs text-slate-400">
+          <div className="flex justify-between items-center pt-4 border-t border-zinc-800 text-xs text-zinc-400">
             <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>بوابة العملاء الآمنة • Namecheap Business Host</span>
+              <ShieldCheck className="w-4 h-4 text-[#E40107]" />
+              <span>بوابة MMG VIP الآمنة • Modern Media Global (mmglobal.vip)</span>
             </div>
-            <div className="font-mono">
+            <div className="font-mono text-zinc-400">
               CONFIDENTIAL • {currentSlide + 1} / {totalSlides}
             </div>
           </div>
@@ -201,7 +200,7 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
       </div>
 
       {/* Presentation Control Bar */}
-      <div className="h-16 border-t border-slate-800 bg-slate-900 px-6 flex items-center justify-between">
+      <div className="h-16 border-t border-zinc-800 bg-[#0c0c0e] px-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {slides.map((_, index) => (
             <button
@@ -209,8 +208,8 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
               onClick={() => setCurrentSlide(index)}
               className={`h-2 rounded-full transition-all ${
                 index === currentSlide
-                  ? 'w-8 bg-indigo-500'
-                  : 'w-2 bg-slate-700 hover:bg-slate-600'
+                  ? 'w-8 bg-[#E40107]'
+                  : 'w-2 bg-zinc-800 hover:bg-zinc-700'
               }`}
               title={`الانتقال للشريحة ${index + 1}`}
             />
@@ -221,20 +220,20 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
           <button
             onClick={() => setCurrentSlide((s) => Math.max(0, s - 1))}
             disabled={currentSlide === 0}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-sm font-medium transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 disabled:opacity-30 text-sm font-medium border border-zinc-800 transition-colors text-zinc-200"
           >
             <ChevronRight className="w-4 h-4" />
             <span>الشريحة السابقة</span>
           </button>
 
-          <span className="font-mono text-sm px-2 text-slate-300">
+          <span className="font-mono text-sm px-2 text-zinc-300">
             {currentSlide + 1} / {totalSlides}
           </span>
 
           <button
             onClick={() => setCurrentSlide((s) => Math.min(totalSlides - 1, s + 1))}
             disabled={currentSlide === totalSlides - 1}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 text-sm font-medium text-white transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#E40107] hover:bg-[#c90005] disabled:opacity-30 text-sm font-medium text-white transition-colors shadow-lg shadow-red-950/40"
           >
             <span>الشريحة التالية</span>
             <ChevronLeft className="w-4 h-4" />

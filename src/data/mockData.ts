@@ -425,11 +425,11 @@ export const initialDocuments: DocumentItem[] = [
 
 export const initialWatermarkConfig: WatermarkConfig = {
   enabled: true,
-  template: '{email} | {ip} | {date} | نسخة خاصة غير مصرح بنسخها',
+  template: 'MMG VIP • {email} | {ip} | {date} | سري للغاية',
   fontSize: 16,
-  opacity: 0.18,
+  opacity: 0.22,
   rotation: -25,
-  color: '#ffffff',
+  color: '#E40107',
   density: 'medium',
   driftAnimation: true,
   showClientName: true,

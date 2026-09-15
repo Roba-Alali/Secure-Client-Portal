@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ClientUser, AdminNotification, UserRole } from '../types';
+import { MmgLogo } from './MmgLogo';
 import {
   Lock,
   ShieldCheck,
@@ -10,7 +11,7 @@ import {
   Layers,
   ChevronDown,
   Sparkles,
-  Server
+  ExternalLink
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -38,27 +39,30 @@ export const Navbar: React.FC<NavbarProps> = ({
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 lg:px-8 py-3">
+    <header className="sticky top-0 z-40 bg-[#0c0c0e]/95 backdrop-blur-md border-b border-zinc-800/80 px-4 lg:px-8 py-2.5">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-        {/* Brand & Mode Indicator */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center font-bold shadow-inner">
-            <Lock className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-black text-white text-base tracking-tight">
-                Secure Client Portal
-              </span>
-              <span className="text-[10px] bg-slate-800 text-amber-400 px-2 py-0.5 rounded border border-slate-700 font-mono hidden sm:inline">
-                Namecheap Ready
-              </span>
+        {/* MMG Brand & VIP Portal Indicator */}
+        <div className="flex items-center gap-3.5">
+          <div className="flex items-center gap-2.5">
+            <MmgLogo size="sm" variant="icon" />
+            <div className="hidden sm:block">
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-white text-base tracking-tight font-sans">
+                  MMG
+                </span>
+                <span className="text-[11px] font-bold text-zinc-300 uppercase tracking-widest hidden md:inline">
+                  Modern Media Global
+                </span>
+                <span className="text-[10px] bg-[#E40107]/15 text-[#ff4b4f] px-2 py-0.5 rounded border border-[#E40107]/30 font-bold tracking-wider">
+                  VIP PORTAL
+                </span>
+              </div>
+              <p className="text-[11px] text-zinc-400 truncate">
+                {currentRole === 'admin'
+                  ? 'لوحة إدارة النظام وحماية مستندات MMG'
+                  : `بوابة العميل المعتمد: ${currentClient?.company || 'العميل'}`}
+              </p>
             </div>
-            <p className="text-[11px] text-slate-400 truncate">
-              {currentRole === 'admin'
-                ? 'لوحة إدارة النظام وحماية المستندات'
-                : `بوابة العميل: ${currentClient?.company || 'العميل'}`}
-            </p>
           </div>
         </div>
 
@@ -69,19 +73,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="relative">
               <button
                 onClick={() => setShowClientMenu(!showClientMenu)}
-                className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 text-xs font-semibold text-slate-200 flex items-center gap-2 transition-colors"
+                className="px-3 py-1.5 rounded-xl bg-zinc-900/90 border border-zinc-700/70 hover:border-zinc-500 text-xs font-semibold text-zinc-200 flex items-center gap-2 transition-colors"
               >
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                <span className="truncate max-w-[130px] sm:max-w-[180px]">
+                <span className="w-2 h-2 rounded-full bg-[#E40107] animate-pulse" />
+                <span className="truncate max-w-[120px] sm:max-w-[170px]">
                   {currentClient.name}
                 </span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
               </button>
 
               {showClientMenu && (
-                <div className="absolute left-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-2 z-50 text-right">
-                  <div className="px-2 py-1.5 text-[10px] text-slate-400 font-bold border-b border-slate-800 mb-1">
-                    تبديل حساب العميل المعروض:
+                <div className="absolute left-0 mt-2 w-64 bg-[#141418] border border-zinc-700 rounded-xl shadow-2xl p-2 z-50 text-right">
+                  <div className="px-2 py-1.5 text-[10px] text-zinc-400 font-bold border-b border-zinc-800 mb-1 flex items-center justify-between">
+                    <span>تبديل حساب العميل المعروض:</span>
+                    <span className="text-[#ff4b4f] font-mono text-[9px]">MMG VIP</span>
                   </div>
                   {clients.map((c) => (
                     <button
@@ -92,12 +97,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className={`w-full text-right px-2.5 py-2 rounded-lg text-xs flex flex-col transition-colors ${
                         c.id === currentClient.id
-                          ? 'bg-amber-500/10 text-amber-400 font-bold'
-                          : 'text-slate-300 hover:bg-slate-800'
+                          ? 'bg-[#E40107]/15 text-[#ff4b4f] font-bold border border-[#E40107]/20'
+                          : 'text-zinc-300 hover:bg-zinc-800/80'
                       }`}
                     >
                       <span className="font-semibold">{c.name}</span>
-                      <span className="text-[10px] text-slate-500">{c.company}</span>
+                      <span className="text-[10px] text-zinc-400">{c.company}</span>
                     </button>
                   ))}
                 </div>
@@ -105,14 +110,26 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           )}
 
+          {/* Direct Link to mmglobal.vip */}
+          <a
+            href="https://mmglobal.vip"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white text-[11px] font-medium transition-colors"
+            title="الانتقال للموقع الرئيسي mmglobal.vip"
+          >
+            <span>mmglobal.vip</span>
+            <ExternalLink className="w-3 h-3 text-zinc-500" />
+          </a>
+
           {/* Role Switcher Button: Client <-> Admin */}
           <button
             id="switch-portal-role-btn"
             onClick={() => onSwitchRole(currentRole === 'admin' ? 'client' : 'admin')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow ${
               currentRole === 'admin'
-                ? 'bg-indigo-600 hover:bg-indigo-500 text-white'
-                : 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                ? 'bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700'
+                : 'bg-[#E40107] hover:bg-[#c90005] text-white shadow-lg shadow-red-950/40'
             }`}
           >
             {currentRole === 'admin' ? (
@@ -132,34 +149,34 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="relative">
             <button
               onClick={() => setShowNotifs(!showNotifs)}
-              className="p-2 rounded-xl bg-slate-950 border border-slate-800 hover:bg-slate-800 text-slate-300 relative transition-colors"
+              className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 relative transition-colors"
               title="الإشعارات"
             >
               <Bell className="w-4 h-4" />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-[10px] text-white flex items-center justify-center font-bold animate-pulse">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#E40107] text-[10px] text-white flex items-center justify-center font-bold animate-pulse">
                   {unreadCount}
                 </span>
               )}
             </button>
 
             {showNotifs && (
-              <div className="absolute left-0 mt-2 w-80 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-4 z-50 text-right">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800 mb-2">
-                  <span className="text-xs font-bold text-white">تنبيهات البوابة المباشرة</span>
-                  <span className="text-[10px] text-emerald-400 font-mono">SMTP Active</span>
+              <div className="absolute left-0 mt-2 w-80 bg-[#121216] border border-zinc-800 rounded-2xl shadow-2xl p-4 z-50 text-right">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-800 mb-2">
+                  <span className="text-xs font-bold text-white">تنبيهات بوابة MMG المباشرة</span>
+                  <span className="text-[10px] text-emerald-400 font-mono">Real-Time Active</span>
                 </div>
                 <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                   {notifications.slice(0, 5).map((n) => (
                     <div
                       key={n.id}
-                      className="p-2 bg-slate-950 rounded-lg border border-slate-800 text-[11px]"
+                      className="p-2 bg-zinc-950 rounded-lg border border-zinc-800/80 text-[11px]"
                     >
-                      <div className="font-bold text-slate-200">{n.title}</div>
-                      <div className="text-slate-400 text-[10px] line-clamp-2 mt-0.5">
+                      <div className="font-bold text-zinc-200">{n.title}</div>
+                      <div className="text-zinc-400 text-[10px] line-clamp-2 mt-0.5">
                         {n.message}
                       </div>
-                      <div className="text-[9px] text-slate-500 mt-1 font-mono">{n.timestamp}</div>
+                      <div className="text-[9px] text-zinc-500 mt-1 font-mono">{n.timestamp}</div>
                     </div>
                   ))}
                 </div>
@@ -170,7 +187,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Logout Button */}
           <button
             onClick={onLogout}
-            className="p-2 rounded-xl bg-slate-950 border border-slate-800 hover:bg-rose-500/10 hover:text-rose-400 text-slate-400 transition-colors"
+            className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-rose-500/15 hover:border-rose-500/30 hover:text-rose-400 text-zinc-400 transition-colors"
             title="تسجيل الخروج"
           >
             <LogOut className="w-4 h-4" />

@@ -1,6 +1,6 @@
 {
   "name": "Secure Client Portal",
-  "description": "بوابة عملاء مخصصة مع عارض PDF المحمي بعلامات مائية ديناميكية وتتبع المشاهدات وإدارة المشاريع للاستضافة المخصصة.",
+  "description": "بوابة عملاء MMG VIP المخصصة لشركة Modern Media Global مع حماية المستندات والعلامات المائية الديناميكية وتتبع المشاهدات.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
