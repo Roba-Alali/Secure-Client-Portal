@@ -44,6 +44,34 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
   const contentRef = useRef<HTMLDivElement>(null);
   const lastHeightRef = useRef<number>(window.innerHeight);
   const unblackoutTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isTouchingRef = useRef<boolean>(false);
+  const blackoutCooldownRef = useRef<number>(0);
+
+  // Direct manual recovery function to allow client to safely return to document
+  const handleManualRestore = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    if (unblackoutTimerRef.current) {
+      clearTimeout(unblackoutTimerRef.current);
+      unblackoutTimerRef.current = null;
+    }
+    if (curtainRef.current) {
+      curtainRef.current.style.display = 'none';
+      curtainRef.current.style.opacity = '0';
+      curtainRef.current.style.visibility = 'hidden';
+    }
+    if (contentRef.current) {
+      contentRef.current.style.display = 'block';
+      contentRef.current.style.opacity = '1';
+      contentRef.current.style.visibility = 'visible';
+      contentRef.current.style.filter = 'none';
+    }
+    setIsObscured(false);
+    setObscureReason('');
+    // Cooldown prevents immediate re-trigger right after clicking restore
+    blackoutCooldownRef.current = Date.now() + 1200;
+  }, []);
 
   // Detect mobile device
   useEffect(() => {
@@ -98,8 +126,12 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
       }
     }
 
-    // 4. Hold blackout for at least 2.2 seconds so any saved screenshot in phone gallery is solid black
+    // 4. Hold blackout briefly so screenshot is solid black, then allow return
     unblackoutTimerRef.current = setTimeout(() => {
+      // If the user still has notifications shade pulled down or window is blurred, stay black!
+      if (!document.hasFocus() || document.hidden || document.visibilityState === 'hidden') {
+        return;
+      }
       if (curtainRef.current) {
         curtainRef.current.style.display = 'none';
         curtainRef.current.style.opacity = '0';
@@ -112,53 +144,79 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
         contentRef.current.style.filter = 'none';
       }
       setIsObscured(false);
-    }, 2200);
+      blackoutCooldownRef.current = Date.now() + 1000;
+    }, 1800);
   }, [enabled, onSecurityEvent]);
 
-  // Global Hardware Shutter Event Listeners
+  // Global Hardware Shutter & Notification Shade / Quick Settings Protection Listeners
   useEffect(() => {
     if (!enabled) return;
 
-    // 1. Visibility Change (triggered when OS captures snapshot or switches app)
+    // 1. Visibility Change & Page Hide (triggered when OS captures snapshot or switches app or opens shade)
     const handleVisibilityChange = () => {
+      if (Date.now() < blackoutCooldownRef.current) return;
       if (document.hidden || document.visibilityState === 'hidden') {
-        executeSynchronousBlackout('تغيير نافذة التطبيق أو استدعاء لقطة شاشة النظام', 'visibility_hidden');
+        executeSynchronousBlackout('تغيير نافذة التطبيق أو سحب قائمة الإشعارات', 'visibility_hidden');
       }
     };
 
-    // 2. Window Blur / Focusout (triggered on Android & iOS when hardware buttons are chorded)
+    // 2. Window Blur (triggered when user leaves window or pulls quick shade)
     const handleWindowBlur = () => {
-      executeSynchronousBlackout('حظر لقطة الشاشة: تم ضغط أزرار الهاتف الجانبية', 'window_blur');
-    };
-
-    const handleFocusOut = () => {
-      executeSynchronousBlackout('حظر التقاط الشاشة: فقدان تركيز المتصفح', 'focusout');
+      if (Date.now() < blackoutCooldownRef.current) return;
+      // If user is just touching or scrolling inside the page, do NOT trigger false blur
+      if (isTouchingRef.current) return;
+      executeSynchronousBlackout('حظر لقطة الشاشة: سحب القائمة المنسدلة أو ضغط أزرار الهاتف', 'window_blur');
     };
 
     const handlePageHide = () => {
+      if (Date.now() < blackoutCooldownRef.current) return;
       executeSynchronousBlackout('حظر التقاط الشاشة: إخفاء صفحة المتصفح', 'pagehide');
     };
 
-    // 3. TouchCancel / PointerCancel:
-    // iOS Safari cancels active touches instantly the exact microsecond Power+Volume are pressed!
-    const handleTouchCancel = () => {
-      executeSynchronousBlackout('حظر لقطة شاشة آيفون/أندرويد عبر مقاطعة اللمس', 'touch_cancel');
-      triggerToast('🚨 تم حظر لقطة الشاشة: استشعار مقاطعة لمس الشاشة والأزرار.');
+    const handleFreeze = () => {
+      if (Date.now() < blackoutCooldownRef.current) return;
+      executeSynchronousBlackout('تجميد حالة الصفحة من نظام التشغيل', 'page_freeze');
     };
 
-    // 4. Android Screenshot Assistant Resize Detection:
-    // When screenshot toolbar appears at bottom of Android screen, innerHeight shrinks
+    // 3. TouchCancel / PointerCancel:
+    // When hardware screenshot buttons (Power+Volume) are pressed simultaneously, mobile OS cancels active touches!
+    const handleTouchCancel = () => {
+      if (Date.now() < blackoutCooldownRef.current) return;
+      // Only trigger if this was an actual active touch that got aborted
+      if (isTouchingRef.current) {
+        isTouchingRef.current = false;
+        executeSynchronousBlackout('حظر لقطة شاشة الهاتف عبر مقاطعة اللمس بأزرار الجهاز', 'touch_cancel');
+        triggerToast('🚨 تم حظر لقطة الشاشة: استشعار مقاطعة لمس الشاشة بأزرار الهاتف.');
+      }
+    };
+
+    // 4. Android Dropdown Notification Shade Detection via Window Resize:
+    // Only flag substantial changes that occur without user touch scrolling
     const handleResize = () => {
+      if (Date.now() < blackoutCooldownRef.current) return;
       const currentHeight = window.innerHeight;
       const heightDelta = Math.abs(currentHeight - lastHeightRef.current);
       lastHeightRef.current = currentHeight;
 
-      if (heightDelta > 40 && !document.hidden) {
-        executeSynchronousBlackout('رصد شريط لقطة الشاشة للنظام الذكي', 'android_screenshot_bar');
+      // When the full Android notification shade or quick settings menu drops down, height shrinks significantly (> 160px)
+      if (heightDelta > 160 && !isTouchingRef.current) {
+        executeSynchronousBlackout('رصد سحب القائمة المنسدلة / شريط النظام', 'notification_shade_pulldown');
       }
     };
 
-    // 5. Print Screen & System Shortcuts
+    // 5. Top-Edge Shade Swipe Detection:
+    // Swiping from the extreme top edge (< 12px) where the OS status bar resides
+    const handleGlobalTouchMove = (e: TouchEvent) => {
+      if (Date.now() < blackoutCooldownRef.current) return;
+      if (e.touches && e.touches.length > 0) {
+        const touch = e.touches[0];
+        if (touch.clientY < 12) {
+          executeSynchronousBlackout('محاولة سحب القائمة المنسدلة لتصوير الشاشة', 'top_edge_shade_swipe');
+        }
+      }
+    };
+
+    // 6. Print Screen & System Shortcuts
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'PrintScreen' || e.code === 'PrintScreen' || e.keyCode === 44) {
         e.preventDefault();
@@ -195,31 +253,36 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
       }
     };
 
-    // 6. MouseLeave on Document (Catches Desktop Snipping Tools, ShareX, Lightshot, External Grabbers)
+    // 7. MouseLeave on Document (Catches Desktop Snipping Tools)
     const handleMouseLeave = (e: MouseEvent) => {
+      if (Date.now() < blackoutCooldownRef.current) return;
       if (e.clientY <= 0 || e.clientX <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight) {
         executeSynchronousBlackout('حظر أداة التقاط وقص الشاشة (خروج المؤشر من النافذة)', 'snipping_tool_exit');
       }
     };
 
-    // 7. BeforePrint event (browser print to PDF / save screenshot)
+    // 8. BeforePrint event (browser print to PDF / save screenshot)
     const handleBeforePrint = () => {
       executeSynchronousBlackout('حظر طباعة أو حفظ المستند كصورة', 'before_print');
     };
 
-    // 8. Focus Heartbeat Check (Polls every 350ms to detect stealth capture tools stealing focus)
+    // 9. Periodic focus check (only when user is not actively interacting)
     const focusInterval = setInterval(() => {
-      if (document.visibilityState === 'visible' && !document.hasFocus() && !isObscured) {
-        executeSynchronousBlackout('فقدان تركيز النافذة (احتمال وجود أداة تصوير خارجية)', 'stealth_focus_loss');
+      if (Date.now() < blackoutCooldownRef.current) return;
+      if (!isTouchingRef.current && (document.hidden || document.visibilityState === 'hidden')) {
+        if (!isObscured) {
+          executeSynchronousBlackout('فقدان تركيز النافذة بسبب القائمة المنسدلة أو أداة خارجية', 'stealth_focus_loss');
+        }
       }
-    }, 350);
+    }, 600);
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleWindowBlur);
-    window.addEventListener('focusout', handleFocusOut);
     window.addEventListener('pagehide', handlePageHide);
+    document.addEventListener('freeze', handleFreeze);
     window.addEventListener('touchcancel', handleTouchCancel, { passive: true });
     window.addEventListener('pointercancel', handleTouchCancel, { passive: true });
+    window.addEventListener('touchmove', handleGlobalTouchMove, { passive: true });
     document.addEventListener('mouseleave', handleMouseLeave);
     window.addEventListener('resize', handleResize);
     window.addEventListener('keydown', handleKeyDown);
@@ -230,10 +293,11 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
       clearInterval(focusInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
-      window.removeEventListener('focusout', handleFocusOut);
       window.removeEventListener('pagehide', handlePageHide);
+      document.removeEventListener('freeze', handleFreeze);
       window.removeEventListener('touchcancel', handleTouchCancel);
       window.removeEventListener('pointercancel', handleTouchCancel);
+      window.removeEventListener('touchmove', handleGlobalTouchMove);
       document.removeEventListener('mouseleave', handleMouseLeave);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('keydown', handleKeyDown);
@@ -247,6 +311,7 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
 
   // Multi-Touch Gesture Detection & Touch Handling
   const handleTouchStart = (e: React.TouchEvent) => {
+    isTouchingRef.current = true;
     if (e.touches.length >= 3) {
       e.preventDefault();
       executeSynchronousBlackout('إيماءة السحب المتعدد (3-Finger Swipe Screenshot)', 'multitouch_gesture');
@@ -267,6 +332,7 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
+    isTouchingRef.current = true;
     if (securityMode === 'spotlight' && e.touches[0] && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       setSpotlightPos({
@@ -278,6 +344,10 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
   };
 
   const handleTouchEnd = () => {
+    // Delay resetting isTouchingRef slightly to absorb delayed blur events caused by touch release
+    setTimeout(() => {
+      isTouchingRef.current = false;
+    }, 150);
     if (securityMode === 'hold_to_view') {
       setIsHoldingTouch(false);
     }
@@ -331,9 +401,9 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={() => {
+        isTouchingRef.current = false;
         setIsHoldingTouch(false);
         setIsSpotlightActive(false);
-        executeSynchronousBlackout('مقاطعة لمس الشاشة', 'touch_cancel');
       }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -356,7 +426,22 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
           transition: 'none' // ZERO latency transition for hardware capture proofing
         }}
       >
-        {children}
+        <div className="w-full h-full">
+          {children}
+        </div>
+
+        {/* Dynamic Anti-Leak Foreground Forensic Micro-Watermark Grid */}
+        <div 
+          className="absolute inset-0 pointer-events-none z-20 overflow-hidden flex flex-wrap items-center justify-around select-none opacity-[0.07] mix-blend-difference"
+          style={{ transform: 'rotate(-25deg) scale(1.15)' }}
+        >
+          {Array.from({ length: 18 }).map((_, i) => (
+            <div key={i} className="p-6 text-center whitespace-nowrap font-mono text-[10px] tracking-wider text-white">
+              <span className="font-bold block text-red-500">MMG VIP PROTECTED</span>
+              <span>{clientName} • {clientEmail}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* 2. Spotlight Reading Lens Veil (When Spotlight Mode is active) */}
@@ -538,9 +623,21 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
           <div>• التوقيت: <span className="text-zinc-400">{currentDateStr}</span></div>
         </div>
 
-        <p className="text-[11px] text-zinc-500 mt-4">
-          ستعود الشاشة تلقائياً بمجرد إيقاف محاولة التصوير والعودة الآمنة للتطبيق.
-        </p>
+        {/* Direct Resume / Return to Document Button */}
+        <div className="mt-5 flex flex-col items-center gap-2">
+          <button
+            type="button"
+            onClick={(e) => handleManualRestore(e)}
+            onTouchEnd={(e) => handleManualRestore(e)}
+            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#E40107] to-[#b80005] hover:from-[#ff1a20] hover:to-[#E40107] text-white text-xs sm:text-sm font-bold shadow-lg shadow-red-950/60 flex items-center gap-2 transition-all active:scale-95 cursor-pointer z-50 border border-red-500/40"
+          >
+            <span>العودة ومتابعة تصفح المستند الآن</span>
+            <Shield className="w-4 h-4" />
+          </button>
+          <span className="text-[10px] text-zinc-500">
+            تُستأنف الرؤية تلقائياً أيضاً بمجرد زوال محاولة التصوير
+          </span>
+        </div>
       </div>
 
       {/* 6. Security Info Modal */}
@@ -566,6 +663,14 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
             </div>
 
             <div className="space-y-2.5 text-xs text-zinc-300 mb-5">
+              <div className="p-2.5 bg-zinc-950 rounded-xl border border-zinc-800 flex items-start gap-2.5">
+                <span className="text-emerald-400 font-bold">✓</span>
+                <div>
+                  <strong className="text-white block">حظر القائمة المنسدلة وشريط الإشعارات (Dropdown Shade Guard):</strong>
+                  سحب القائمة العلوية للهاتف (Quick Settings / Notifications) أو الضغط على خيار لقطة الشاشة من القائمة يُفعّل الحجب الفوري للشاشة وتعتيم المحتوى، ويمنع التقاط أي صورة.
+                </div>
+              </div>
+
               <div className="p-2.5 bg-zinc-950 rounded-xl border border-zinc-800 flex items-start gap-2.5">
                 <span className="text-emerald-400 font-bold">✓</span>
                 <div>
