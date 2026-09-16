@@ -44,10 +44,25 @@ export default function App() {
   const [notifications, setNotifications] = useState<AdminNotification[]>(() => getStoredNotifications());
 
   // Auth & Session States
-  // Start authenticated with client-1 by default so the preview loads the full app immediately
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
-  const [currentRole, setCurrentRole] = useState<UserRole>('client');
-  const [currentClient, setCurrentClient] = useState<ClientUser>(() => clients[0] || getStoredClients()[0]);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem('mmg_session_auth') === 'true';
+  });
+  const [currentRole, setCurrentRole] = useState<UserRole>(() => {
+    return (localStorage.getItem('mmg_session_role') as UserRole) || 'client';
+  });
+  const [currentClient, setCurrentClient] = useState<ClientUser>(() => {
+    try {
+      const savedClientId = localStorage.getItem('mmg_session_client_id');
+      const allClients = getStoredClients();
+      if (savedClientId) {
+        const found = allClients.find((c) => c.id === savedClientId);
+        if (found) return found;
+      }
+      return allClients[0];
+    } catch {
+      return getStoredClients()[0];
+    }
+  });
 
   // Active Viewers State
   const [activePdfDoc, setActivePdfDoc] = useState<DocumentItem | null>(null);
@@ -85,17 +100,25 @@ export default function App() {
 
   // Handlers
   const handleClientLoginSuccess = (client: ClientUser) => {
+    localStorage.setItem('mmg_session_auth', 'true');
+    localStorage.setItem('mmg_session_role', 'client');
+    localStorage.setItem('mmg_session_client_id', client.id);
     setCurrentClient(client);
     setCurrentRole('client');
     setIsAuthenticated(true);
   };
 
   const handleAdminLogin = () => {
+    localStorage.setItem('mmg_session_auth', 'true');
+    localStorage.setItem('mmg_session_role', 'admin');
     setCurrentRole('admin');
     setIsAuthenticated(true);
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('mmg_session_auth');
+    localStorage.removeItem('mmg_session_role');
+    localStorage.removeItem('mmg_session_client_id');
     setIsAuthenticated(false);
   };
 
@@ -182,10 +205,7 @@ export default function App() {
           <Navbar
             currentRole={currentRole}
             currentClient={currentClient}
-            clients={clients}
             notifications={notifications}
-            onSwitchRole={(role) => setCurrentRole(role)}
-            onSelectClient={(c) => setCurrentClient(c)}
             onLogout={handleLogout}
           />
 
@@ -199,7 +219,6 @@ export default function App() {
                 onOpenPdf={(doc) => setActivePdfDoc(doc)}
                 onOpenPresentation={(doc) => setActivePresentationDoc(doc)}
                 onOpenVideo={(doc) => setActiveVideoDoc(doc)}
-                onSwitchToAdmin={() => setCurrentRole('admin')}
               />
             ) : (
               <AdminDashboard

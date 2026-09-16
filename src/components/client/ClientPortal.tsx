@@ -28,7 +28,6 @@ interface ClientPortalProps {
   onOpenPdf: (doc: DocumentItem) => void;
   onOpenPresentation: (doc: DocumentItem) => void;
   onOpenVideo: (doc: DocumentItem) => void;
-  onSwitchToAdmin: () => void;
 }
 
 export const ClientPortal: React.FC<ClientPortalProps> = ({
@@ -38,8 +37,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   watermarkConfig,
   onOpenPdf,
   onOpenPresentation,
-  onOpenVideo,
-  onSwitchToAdmin
+  onOpenVideo
 }) => {
   // Filter projects assigned to this client
   const clientProjects = projects.filter((p) =>
