@@ -66,7 +66,7 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
         pagesViewed: 1,
         maxPageReached: 1,
         timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-        watermarkApplied: `${client.email} | ${client.ipAddress || '197.34.12.88'} | ${new Date().toLocaleTimeString()}`
+        watermarkApplied: `${client.email} | MMG VIP | ${new Date().toLocaleTimeString()}`
       };
 
       const alertNotif: AdminNotification = {
@@ -114,7 +114,7 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
       pagesViewed: maxPageSeen,
       maxPageReached: maxPageSeen,
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      watermarkApplied: `${client.email} | ${client.ipAddress || '197.34.12.88'}`
+      watermarkApplied: `${client.email} | MMG VIP`
     };
     onRecordView(finalLog);
     onClose();
@@ -297,6 +297,11 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
                     MMG RESTRICTED & CONFIDENTIAL
                   </span>
                   <div>DATE: {document.uploadedAt}</div>
+                  {document.originalFileName && (
+                    <div className="text-emerald-700 font-semibold mt-0.5">
+                      SRC: {document.originalFileName} ({document.fileSize})
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -338,7 +343,7 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
                   <div className="p-3 bg-zinc-100/80 rounded-xl border border-zinc-200">
                     <div className="text-[10px] text-zinc-500 uppercase font-mono">Access Security Level</div>
                     <div className="text-xs font-bold text-[#c90005] mt-0.5">Level 3 - MMG Dynamic Watermarked</div>
-                    <div className="text-[11px] text-zinc-600">IP: {client.ipAddress || '197.34.12.88'}</div>
+                    <div className="text-[11px] text-zinc-600">DRM: Protected Document</div>
                   </div>
                 </div>
 
@@ -397,7 +402,7 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
         </div>
 
         <div className="font-mono text-[11px] text-zinc-400">
-          IP: {client.ipAddress || '197.34.12.88'}
+          جلسة آمنة: MMG VIP DRM
         </div>
       </div>
     </div>

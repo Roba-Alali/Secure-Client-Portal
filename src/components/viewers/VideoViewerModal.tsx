@@ -77,7 +77,7 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
         pagesViewed: 1,
         maxPageReached: 1,
         timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-        watermarkApplied: `${client.email} | ${client.ipAddress || '197.34.12.88'}`
+        watermarkApplied: `${client.email} | MMG VIP`
       };
 
       onRecordView(initialLog, alertNotif);
@@ -101,7 +101,7 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
       pagesViewed: 1,
       maxPageReached: 1,
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      watermarkApplied: `${client.email} | ${client.ipAddress || '197.34.12.88'}`
+      watermarkApplied: `${client.email} | MMG VIP`
     };
     onRecordView(finalLog);
     onClose();
@@ -191,15 +191,15 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
             documentTitle={document.title}
           />
 
-          {/* Floating Drift Watermark Pill (prevents corner cropping) */}
-          <div className="absolute top-4 right-4 z-40 bg-zinc-950/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-[#E40107]/30 text-xs font-mono text-[#ff4b4f] font-bold flex items-center gap-2 pointer-events-none shadow-lg">
-            <span className="w-2 h-2 rounded-full bg-[#E40107] animate-ping" />
-            <span>MMG VIP • {client.email} • {client.ipAddress || '197.34.12.88'}</span>
+          {/* Discreet Static Security Badge (Clean, NO IP) */}
+          <div className="absolute top-4 right-4 z-40 bg-zinc-950/80 backdrop-blur-md px-3 py-1 rounded-full border border-[#E40107]/30 text-xs font-mono text-[#ff4b4f] font-bold flex items-center gap-2 pointer-events-none shadow-lg">
+            <span className="w-2 h-2 rounded-full bg-[#E40107] animate-pulse" />
+            <span>MMG VIP • {client.email}</span>
           </div>
 
           <video
             ref={videoRef}
-            src={document.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'}
+            src={document.uploadedFileUrl || document.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'}
             className="w-full h-full object-contain"
             onTimeUpdate={handleTimeUpdate}
             onEnded={() => setIsPlaying(false)}

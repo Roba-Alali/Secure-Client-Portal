@@ -80,7 +80,26 @@ export const saveStoredDocuments = (docs: DocumentItem[]) => {
 export const getStoredWatermarkConfig = (): WatermarkConfig => {
   try {
     const saved = localStorage.getItem(STORAGE_KEYS.WATERMARK);
-    return saved ? JSON.parse(saved) : initialWatermarkConfig;
+    if (!saved) return initialWatermarkConfig;
+    const parsed: WatermarkConfig = JSON.parse(saved);
+    // Sanitize any existing stored config that had IP scrolling everywhere
+    let template = parsed.template || 'MMG VIP • {name} • {email}';
+    if (!parsed.showIp) {
+      template = template
+        .replace(/\s*\|\s*\{ip\}\s*/g, ' ')
+        .replace(/\s*•\s*\{ip\}\s*/g, ' ')
+        .replace(/\{ip\}\s*\|\s*/g, '')
+        .replace(/\{ip\}\s*•\s*/g, '')
+        .replace(/\{ip\}/g, '')
+        .trim();
+    }
+    return {
+      ...initialWatermarkConfig,
+      ...parsed,
+      template: template || 'MMG VIP • {name} • {email} • سري للغاية',
+      showIp: false, // Default to no IP scrolling everywhere
+      dynamicFloatingPill: false // Disable annoying wandering pill
+    };
   } catch {
     return initialWatermarkConfig;
   }

@@ -47,14 +47,23 @@ export const WatermarkOverlay: React.FC<WatermarkOverlayProps> = ({
     const now = new Date();
     const dateStr = now.toLocaleDateString('ar-SA') + ' ' + now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
     
-    let text = config.template || '{email} | {ip} | {date}';
+    let text = config.template || 'MMG VIP • {name} • {email}';
+    // Remove {ip} from template if user disabled showIp or if default
+    if (config.showIp) {
+      text = text.replace(/{ip}/g, clientIp);
+    } else {
+      text = text.replace(/\s*\|\s*\{ip\}\s*/g, ' ')
+                 .replace(/\s*•\s*\{ip\}\s*/g, ' ')
+                 .replace(/\{ip\}\s*\|\s*/g, '')
+                 .replace(/\{ip\}\s*•\s*/g, '')
+                 .replace(/\{ip\}/g, '');
+    }
     text = text.replace(/{email}/g, clientEmail);
-    text = text.replace(/{ip}/g, clientIp);
     text = text.replace(/{date}/g, dateStr);
     text = text.replace(/{name}/g, clientName);
     text = text.replace(/{doc}/g, documentTitle);
-    return text;
-  }, [config.template, clientEmail, clientIp, clientName, documentTitle, liveSeconds]);
+    return text.trim();
+  }, [config.template, config.showIp, clientEmail, clientIp, clientName, documentTitle, liveSeconds]);
 
   // Determine grid density
   const gridCount = config.density === 'high' ? 16 : config.density === 'low' ? 6 : 9;
@@ -65,7 +74,7 @@ export const WatermarkOverlay: React.FC<WatermarkOverlayProps> = ({
       className="absolute inset-0 pointer-events-none select-none z-30 overflow-hidden"
       aria-hidden="true"
     >
-      {/* 1. Diagonal Watermark Matrix */}
+      {/* 1. Diagonal Watermark Matrix (Clean VIP branding, NO IP scrolling) */}
       <div
         className="w-full h-full"
         style={{
@@ -101,35 +110,26 @@ export const WatermarkOverlay: React.FC<WatermarkOverlayProps> = ({
         ))}
       </div>
 
-      {/* 2. Dynamic Wandering Anti-Crop Floating Watermark Pill */}
-      {/* Impossible to crop out on mobile screens because it drifts across the document */}
-      {config.dynamicFloatingPill !== false && (
-        <div
-          className="absolute z-40 transition-all duration-1000 ease-in-out pointer-events-none"
-          style={{
-            top: `${pillCoords.top}%`,
-            left: `${pillCoords.left}%`,
-            transform: 'translate(-50%, -50%)'
-          }}
-        >
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/85 border border-[#E40107]/50 shadow-2xl backdrop-blur-md text-[11px] font-mono font-bold text-white whitespace-nowrap">
-            <span className="w-2 h-2 rounded-full bg-[#E40107] animate-ping" />
-            <Shield className="w-3.5 h-3.5 text-[#ff4b4f]" />
-            <span className="text-[#ff4b4f]">MMG VIP</span>
-            <span className="text-zinc-400">•</span>
-            <span className="text-zinc-200">{clientEmail}</span>
-            <span className="text-zinc-400">•</span>
-            <span className="text-amber-400">IP: {clientIp}</span>
-            <span className="text-zinc-500">[{liveSeconds}s]</span>
+      {/* 2. Stationary Discreet DRM Badge (NO IP, NO wandering/scrolling across screen) */}
+      {config.dynamicFloatingPill && (
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-black/80 border border-[#E40107]/40 shadow-xl backdrop-blur-md text-[10px] font-mono font-bold text-white whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#E40107] animate-pulse" />
+            <Shield className="w-3 h-3 text-[#ff4b4f]" />
+            <span className="text-[#ff4b4f]">MMG VIP DRM</span>
+            <span className="text-zinc-500">•</span>
+            <span className="text-zinc-300">{clientEmail}</span>
+            <span className="text-zinc-500">•</span>
+            <span className="text-emerald-400">محمي ضد التصوير</span>
           </div>
         </div>
       )}
 
-      {/* 3. Four-Corner Anti-Crop Security Micro-Stamps */}
+      {/* 3. Four-Corner Security Micro-Stamps (Clean, NO IP) */}
       {config.antiCropCornerStamps !== false && (
         <>
           <div className="absolute top-2 left-2 z-30 text-[9px] font-mono text-zinc-500/80 bg-black/50 px-2 py-0.5 rounded border border-zinc-800 pointer-events-none">
-            MMG-VIP • {clientIp} • CONFIDENTIAL
+            MMG-VIP • CONFIDENTIAL
           </div>
           <div className="absolute top-2 right-2 z-30 text-[9px] font-mono text-zinc-500/80 bg-black/50 px-2 py-0.5 rounded border border-zinc-800 pointer-events-none">
             DO NOT CAPTURE • {clientEmail}

@@ -38,6 +38,9 @@ export interface DocumentItem {
   contentPages?: string[];
   slides?: { title: string; subtitle: string; content: string[] }[];
   videoUrl?: string;
+  uploadedFileUrl?: string;
+  originalFileName?: string;
+  mimeType?: string;
 }
 
 export interface Project {

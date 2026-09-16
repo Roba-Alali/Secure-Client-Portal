@@ -1,1 +1,76 @@
 @import "tailwindcss";
+
+/* 
+ * 1. Global Scrollbar Hiding (إخفاء أشرطة التمرير عالمياً مع الحفاظ الكامل على قابلية التمرير)
+ * Hides visual scrollbar tracks across all modern and legacy browsers (Chrome, Safari, Firefox, Edge, iOS, Android)
+ * while preserving smooth scrolling behavior.
+ */
+html,
+body,
+#root,
+* {
+  -ms-overflow-style: none !important; /* Internet Explorer and Edge */
+  scrollbar-width: none !important; /* Firefox */
+}
+
+*::-webkit-scrollbar {
+  display: none !important; /* Chrome, Safari, Opera, WebKit */
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+/* 
+ * 2. MMG VIP Mobile & Desktop Anti-Screenshot & DRM Protections
+ */
+@media print {
+  html, body, #root, * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+  body::after {
+    display: block !important;
+    content: "⚠️ MODERN MEDIA GLOBAL (MMG VIP) - محتوى سري للغاية ومحمي. يمنع منعا باتا الطباعة أو تصوير الشاشة أو الحفظ.";
+    color: #E40107;
+    font-size: 22px;
+    font-weight: bold;
+    text-align: center;
+    padding: 80px 20px;
+    font-family: sans-serif;
+  }
+}
+
+/* Disallow context menus, text selection, image dragging, and iOS callouts on protected stages */
+#drm-protected-stage,
+.drm-protected,
+.drm-canvas {
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  -khtml-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Anti-Screenshot Spotlight Mask filter */
+.drm-spotlight-veil {
+  backdrop-filter: blur(24px) brightness(0.35) contrast(1.2);
+  -webkit-backdrop-filter: blur(24px) brightness(0.35) contrast(1.2);
+}
+
+/* Fast synchronous blackout styling */
+.screencap-blackout #drm-protected-stage {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  filter: blur(100px) !important;
+}
+
+.screencap-blackout #mobile-security-blackout {
+  display: flex !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  z-index: 99999 !important;
+}
+

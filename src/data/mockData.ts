@@ -425,7 +425,7 @@ export const initialDocuments: DocumentItem[] = [
 
 export const initialWatermarkConfig: WatermarkConfig = {
   enabled: true,
-  template: 'MMG VIP • {email} | {ip} | {date} | سري للغاية',
+  template: 'MMG VIP • {name} • {email} • سري للغاية',
   fontSize: 16,
   opacity: 0.22,
   rotation: -25,
@@ -434,11 +434,11 @@ export const initialWatermarkConfig: WatermarkConfig = {
   driftAnimation: true,
   showClientName: true,
   showTimestamp: true,
-  showIp: true,
+  showIp: false,
   mobileScreenshotShield: true,
   obscureOnAppSwitch: true,
   multiTouchGestureShield: true,
-  dynamicFloatingPill: true,
+  dynamicFloatingPill: false,
   antiCropCornerStamps: true
 };
 

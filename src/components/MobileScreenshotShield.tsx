@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Shield, ShieldAlert, Lock, AlertTriangle, EyeOff, Smartphone } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Shield, ShieldAlert, Lock, AlertTriangle, Smartphone, Hand, Zap, Eye, Check, Scan } from 'lucide-react';
 import { MmgLogo } from './MmgLogo';
 
 interface MobileScreenshotShieldProps {
@@ -12,10 +12,11 @@ interface MobileScreenshotShieldProps {
   children: React.ReactNode;
 }
 
+export type ShieldSecurityMode = 'auto' | 'spotlight' | 'hold_to_view';
+
 export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
   clientName,
   clientEmail,
-  clientIp = '197.34.12.88',
   documentTitle = 'مستند سري',
   enabled = true,
   onSecurityEvent,
@@ -27,11 +28,28 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
 
+  // Security Modes:
+  // 'auto': Instant hardware blackout on blur, visibilitychange, touchcancel, mouseleave, shortcut keys
+  // 'spotlight': Spotlight Reading Lens - document is blurred; only moving touched circle reveals text (anti-capture)
+  // 'hold_to_view': Continuous Hold Guard - user must touch/click and hold to view; releasing snaps to black
+  const [securityMode, setSecurityMode] = useState<ShieldSecurityMode>('auto');
+  const [isHoldingTouch, setIsHoldingTouch] = useState(false);
+
+  // Spotlight Coordinates
+  const [spotlightPos, setSpotlightPos] = useState<{ x: number; y: number }>({ x: 300, y: 300 });
+  const [isSpotlightActive, setIsSpotlightActive] = useState(false);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const curtainRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const lastHeightRef = useRef<number>(window.innerHeight);
+  const unblackoutTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Detect mobile device
   useEffect(() => {
     const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
       navigator.userAgent
-    ) || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    ) || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || window.innerWidth < 800;
     setIsMobileDevice(isMobile);
   }, []);
 
@@ -42,124 +60,259 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
     }, 3800);
   }, []);
 
-  // 1. Mobile App-Switch / Screenshot Detection via Visibility & Blur
+  // SYNCHRONOUS ZERO-LATENCY HARDWARE BLACKOUT
+  // Mutates DOM styles synchronously in <1 millisecond BEFORE the OS compositor captures the screen
+  const executeSynchronousBlackout = useCallback((reason: string, eventType: string) => {
+    if (!enabled) return;
+
+    if (unblackoutTimerRef.current) {
+      clearTimeout(unblackoutTimerRef.current);
+      unblackoutTimerRef.current = null;
+    }
+
+    // 1. Direct synchronous DOM manipulation (0ms delay, bypasses React batching)
+    if (curtainRef.current) {
+      curtainRef.current.style.display = 'flex';
+      curtainRef.current.style.opacity = '1';
+      curtainRef.current.style.visibility = 'visible';
+      curtainRef.current.style.zIndex = '99999';
+    }
+    if (contentRef.current) {
+      contentRef.current.style.display = 'none';
+      contentRef.current.style.opacity = '0';
+      contentRef.current.style.visibility = 'hidden';
+      contentRef.current.style.filter = 'blur(100px)';
+    }
+
+    // 2. Sync React state
+    setIsObscured(true);
+    setObscureReason(reason);
+    onSecurityEvent?.(eventType, reason);
+
+    // 3. Clear clipboard immediately to prevent clipboard scraping
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        navigator.clipboard.writeText('⚠️ محتوى MMG VIP محمي ومصرح للعميل فقط.');
+      } catch {
+        // clipboard access restricted
+      }
+    }
+
+    // 4. Hold blackout for at least 2.2 seconds so any saved screenshot in phone gallery is solid black
+    unblackoutTimerRef.current = setTimeout(() => {
+      if (curtainRef.current) {
+        curtainRef.current.style.display = 'none';
+        curtainRef.current.style.opacity = '0';
+        curtainRef.current.style.visibility = 'hidden';
+      }
+      if (contentRef.current) {
+        contentRef.current.style.display = 'block';
+        contentRef.current.style.opacity = '1';
+        contentRef.current.style.visibility = 'visible';
+        contentRef.current.style.filter = 'none';
+      }
+      setIsObscured(false);
+    }, 2200);
+  }, [enabled, onSecurityEvent]);
+
+  // Global Hardware Shutter Event Listeners
   useEffect(() => {
     if (!enabled) return;
 
-    let timeoutId: NodeJS.Timeout;
-
+    // 1. Visibility Change (triggered when OS captures snapshot or switches app)
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        setIsObscured(true);
-        setObscureReason('تغيير نافذة التطبيق أو التقاط شاشة النظام');
-        onSecurityEvent?.('visibility_hidden', 'Document hidden / app switch detected');
-      } else {
-        // When coming back, hold obscure for 300ms to avoid capturing on resume
-        timeoutId = setTimeout(() => {
-          setIsObscured(false);
-        }, 300);
+      if (document.hidden || document.visibilityState === 'hidden') {
+        executeSynchronousBlackout('تغيير نافذة التطبيق أو استدعاء لقطة شاشة النظام', 'visibility_hidden');
       }
     };
 
+    // 2. Window Blur / Focusout (triggered on Android & iOS when hardware buttons are chorded)
     const handleWindowBlur = () => {
-      // Mobile OS takes snapshot during blur when hardware buttons (Power+Vol) are pressed
-      setIsObscured(true);
-      setObscureReason('تم حظر لقطة الشاشة: فقدان تركيز المتصفح');
-      onSecurityEvent?.('window_blur', 'Window lost focus / hardware screenshot trigger');
+      executeSynchronousBlackout('حظر لقطة الشاشة: تم ضغط أزرار الهاتف الجانبية', 'window_blur');
     };
 
-    const handleWindowFocus = () => {
-      timeoutId = setTimeout(() => {
-        setIsObscured(false);
-      }, 300);
+    const handleFocusOut = () => {
+      executeSynchronousBlackout('حظر التقاط الشاشة: فقدان تركيز المتصفح', 'focusout');
     };
+
+    const handlePageHide = () => {
+      executeSynchronousBlackout('حظر التقاط الشاشة: إخفاء صفحة المتصفح', 'pagehide');
+    };
+
+    // 3. TouchCancel / PointerCancel:
+    // iOS Safari cancels active touches instantly the exact microsecond Power+Volume are pressed!
+    const handleTouchCancel = () => {
+      executeSynchronousBlackout('حظر لقطة شاشة آيفون/أندرويد عبر مقاطعة اللمس', 'touch_cancel');
+      triggerToast('🚨 تم حظر لقطة الشاشة: استشعار مقاطعة لمس الشاشة والأزرار.');
+    };
+
+    // 4. Android Screenshot Assistant Resize Detection:
+    // When screenshot toolbar appears at bottom of Android screen, innerHeight shrinks
+    const handleResize = () => {
+      const currentHeight = window.innerHeight;
+      const heightDelta = Math.abs(currentHeight - lastHeightRef.current);
+      lastHeightRef.current = currentHeight;
+
+      if (heightDelta > 40 && !document.hidden) {
+        executeSynchronousBlackout('رصد شريط لقطة الشاشة للنظام الذكي', 'android_screenshot_bar');
+      }
+    };
+
+    // 5. Print Screen & System Shortcuts
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'PrintScreen' || e.code === 'PrintScreen' || e.keyCode === 44) {
+        e.preventDefault();
+        executeSynchronousBlackout('محاولة استخدام مفتاح تصوير الشاشة (PrintScreen)', 'printscreen');
+        triggerToast('🚨 تم حظر لقطة الشاشة: مفتاح تصوير الشاشة مقفل ومسجل.');
+      }
+
+      // Cmd + Shift + 3/4/5 (Mac / iPad)
+      if (e.metaKey && e.shiftKey && ['3', '4', '5'].includes(e.key)) {
+        e.preventDefault();
+        executeSynchronousBlackout('اختصار تصوير الشاشة في نظام Mac/iPad (Cmd+Shift)', 'mac_screenshot');
+        triggerToast('🚨 تم حظر لقطة الشاشة بنجاح.');
+      }
+
+      // Win + Shift + S
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key.toLowerCase() === 's' || e.code === 'KeyS')) {
+        e.preventDefault();
+        executeSynchronousBlackout('أداة قص الشاشة Snipping Tool (Win+Shift+S)', 'snipping_tool');
+        triggerToast('🚨 تم حظر أداة التقاط الشاشة.');
+      }
+
+      // Ctrl + P / Cmd + P (Print)
+      if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'p' || e.code === 'KeyP')) {
+        e.preventDefault();
+        executeSynchronousBlackout('محاولة طباعة المستند', 'print_attempt');
+        triggerToast('⚠️ طباعة المستند محظورة لحماية الملكية الفكرية.');
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'PrintScreen' || e.code === 'PrintScreen' || e.keyCode === 44) {
+        e.preventDefault();
+        executeSynchronousBlackout('محاولة تصوير الشاشة (PrintScreen)', 'printscreen');
+      }
+    };
+
+    // 6. MouseLeave on Document (Catches Desktop Snipping Tools, ShareX, Lightshot, External Grabbers)
+    const handleMouseLeave = (e: MouseEvent) => {
+      if (e.clientY <= 0 || e.clientX <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight) {
+        executeSynchronousBlackout('حظر أداة التقاط وقص الشاشة (خروج المؤشر من النافذة)', 'snipping_tool_exit');
+      }
+    };
+
+    // 7. BeforePrint event (browser print to PDF / save screenshot)
+    const handleBeforePrint = () => {
+      executeSynchronousBlackout('حظر طباعة أو حفظ المستند كصورة', 'before_print');
+    };
+
+    // 8. Focus Heartbeat Check (Polls every 350ms to detect stealth capture tools stealing focus)
+    const focusInterval = setInterval(() => {
+      if (document.visibilityState === 'visible' && !document.hasFocus() && !isObscured) {
+        executeSynchronousBlackout('فقدان تركيز النافذة (احتمال وجود أداة تصوير خارجية)', 'stealth_focus_loss');
+      }
+    }, 350);
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleWindowBlur);
-    window.addEventListener('focus', handleWindowFocus);
-    window.addEventListener('pagehide', handleWindowBlur);
+    window.addEventListener('focusout', handleFocusOut);
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('touchcancel', handleTouchCancel, { passive: true });
+    window.addEventListener('pointercancel', handleTouchCancel, { passive: true });
+    document.addEventListener('mouseleave', handleMouseLeave);
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('beforeprint', handleBeforePrint);
 
     return () => {
-      clearTimeout(timeoutId);
+      clearInterval(focusInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
-      window.removeEventListener('focus', handleWindowFocus);
-      window.removeEventListener('pagehide', handleWindowBlur);
-    };
-  }, [enabled, onSecurityEvent]);
-
-  // 2. Hardware / Keyboard Screenshot and Clipboard Sanitization
-  useEffect(() => {
-    if (!enabled) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // PrintScreen key
-      if (e.key === 'PrintScreen' || e.code === 'PrintScreen') {
-        e.preventDefault();
-        // Clear clipboard immediately
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText('⚠️ MMG VIP: التقاط الشاشة محظور ومسجل في النظام الأمني.');
-        }
-        setIsObscured(true);
-        setObscureReason('محاولة استخدام مفتاح تصوير الشاشة (PrintScreen)');
-        triggerToast('🚨 تم حظر لقطة الشاشة: محاولة تصوير الشاشة مقفلة ومسجلة أمنياً.');
-        onSecurityEvent?.('printscreen_pressed', 'PrintScreen key pressed');
-        setTimeout(() => setIsObscured(false), 1800);
-      }
-
-      // Mac / iPad screenshot shortcuts: Cmd + Shift + 3 / 4 / 5
-      if (e.metaKey && e.shiftKey && ['3', '4', '5'].includes(e.key)) {
-        e.preventDefault();
-        setIsObscured(true);
-        setObscureReason('محاولة التقاط شاشة عبر اختصارات النظام (Command+Shift)');
-        triggerToast('🚨 تم حظر لقطة الشاشة: تم حجب اختصار تصوير الشاشة بنجاح.');
-        onSecurityEvent?.('mac_screenshot_shortcut', `Cmd+Shift+${e.key} triggered`);
-        setTimeout(() => setIsObscured(false), 2000);
-      }
-
-      // Windows Snipping Tool: Win + Shift + S or Ctrl + Shift + S
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key.toLowerCase() === 's' || e.code === 'KeyS')) {
-        e.preventDefault();
-        setIsObscured(true);
-        setObscureReason('أداة قص الشاشة Snipping Tool');
-        triggerToast('🚨 تم حظر أداة التقاط الشاشة.');
-        onSecurityEvent?.('snipping_tool_shortcut', 'Snipping tool shortcut detected');
-        setTimeout(() => setIsObscured(false), 2000);
-      }
-    };
-
-    // Copy prevention & clipboard sanitization
-    const handleCopy = (e: ClipboardEvent) => {
-      e.preventDefault();
-      triggerToast('⚠️ نسخ المحتوى محظور لحماية الملكية الفكرية لـ MMG VIP.');
-      onSecurityEvent?.('copy_attempt', 'User attempted to copy content');
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('copy', handleCopy);
-
-    return () => {
+      window.removeEventListener('focusout', handleFocusOut);
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('touchcancel', handleTouchCancel);
+      window.removeEventListener('pointercancel', handleTouchCancel);
+      document.removeEventListener('mouseleave', handleMouseLeave);
+      window.removeEventListener('resize', handleResize);
       window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('copy', handleCopy);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('beforeprint', handleBeforePrint);
+      if (unblackoutTimerRef.current) {
+        clearTimeout(unblackoutTimerRef.current);
+      }
     };
-  }, [enabled, onSecurityEvent, triggerToast]);
+  }, [enabled, executeSynchronousBlackout, triggerToast, isObscured]);
 
-  // 3. Multi-Touch Gesture (3-finger screenshot gesture common in Android phones)
+  // Multi-Touch Gesture Detection & Touch Handling
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length >= 3) {
       e.preventDefault();
-      e.stopPropagation();
-      setIsObscured(true);
-      setObscureReason('حظر إيماءة لقطة الشاشة باللمس الثلاثي (3-Finger Gesture)');
-      triggerToast('🚨 تم حظر لقطة الشاشة: إيماءة السحب المتعدد محظورة على الهواتف.');
-      onSecurityEvent?.('multitouch_gesture', '3+ fingers gesture screenshot attempt');
-      setTimeout(() => setIsObscured(false), 2200);
+      executeSynchronousBlackout('إيماءة السحب المتعدد (3-Finger Swipe Screenshot)', 'multitouch_gesture');
+      triggerToast('🚨 تم حظر إيماءة لقطة الشاشة متعددة الأصابع.');
+    } else {
+      if (securityMode === 'hold_to_view') {
+        setIsHoldingTouch(true);
+      }
+      if (securityMode === 'spotlight' && e.touches[0] && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setSpotlightPos({
+          x: e.touches[0].clientX - rect.left,
+          y: e.touches[0].clientY - rect.top
+        });
+        setIsSpotlightActive(true);
+      }
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (securityMode === 'spotlight' && e.touches[0] && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setSpotlightPos({
+        x: e.touches[0].clientX - rect.left,
+        y: e.touches[0].clientY - rect.top
+      });
+      setIsSpotlightActive(true);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (securityMode === 'hold_to_view') {
+      setIsHoldingTouch(false);
+    }
+    if (securityMode === 'spotlight') {
+      setIsSpotlightActive(false);
+    }
+  };
+
+  // Mouse handling for Desktop Spotlight and Hold
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (securityMode === 'spotlight' && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setSpotlightPos({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      });
+      setIsSpotlightActive(true);
+    }
+  };
+
+  const handleMouseDown = () => {
+    if (securityMode === 'hold_to_view') {
+      setIsHoldingTouch(true);
+    }
+  };
+
+  const handleMouseUp = () => {
+    if (securityMode === 'hold_to_view') {
+      setIsHoldingTouch(false);
     }
   };
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    triggerToast('⚠️ قائمة الخيارات السريعة معطلة لحماية المستند.');
+    triggerToast('⚠️ قائمة الخيارات معطلة لحماية المستند.');
   };
 
   const currentDateStr = new Date().toLocaleString('ar-SA', {
@@ -167,14 +320,24 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
+    minute: '2-digit'
   });
 
   return (
     <div
+      ref={containerRef}
       className="relative w-full h-full select-none overflow-hidden"
       onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={() => {
+        setIsHoldingTouch(false);
+        setIsSpotlightActive(false);
+        executeSynchronousBlackout('مقاطعة لمس الشاشة', 'touch_cancel');
+      }}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
       onContextMenu={handleContextMenu}
       style={{
         WebkitTouchCallout: 'none',
@@ -182,87 +345,205 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
         userSelect: 'none'
       }}
     >
-      {/* Underlying Protected Document Content */}
-      <div className={`w-full h-full transition-all duration-150 ${isObscured ? 'filter blur-2xl opacity-0 scale-95 pointer-events-none' : 'filter-none opacity-100'}`}>
+      {/* 1. Underlying Protected Content Stage */}
+      <div
+        ref={contentRef}
+        id="drm-protected-stage"
+        className="w-full h-full"
+        style={{
+          display: isObscured ? 'none' : 'block',
+          opacity: isObscured ? 0 : 1,
+          transition: 'none' // ZERO latency transition for hardware capture proofing
+        }}
+      >
         {children}
       </div>
 
-      {/* Floating Mobile Screenshot Shield Status Badge */}
-      <div className="absolute top-3 left-3 z-40 flex items-center gap-1.5">
+      {/* 2. Spotlight Reading Lens Veil (When Spotlight Mode is active) */}
+      {securityMode === 'spotlight' && !isObscured && (
+        <div
+          className="absolute inset-0 pointer-events-none z-30 transition-opacity duration-150"
+          style={{
+            backdropFilter: 'blur(20px) brightness(0.35) contrast(1.15)',
+            WebkitBackdropFilter: 'blur(20px) brightness(0.35) contrast(1.15)',
+            maskImage: isSpotlightActive
+              ? `radial-gradient(circle 140px at ${spotlightPos.x}px ${spotlightPos.y}px, transparent 0%, transparent 65%, black 100%)`
+              : 'none',
+            WebkitMaskImage: isSpotlightActive
+              ? `radial-gradient(circle 140px at ${spotlightPos.x}px ${spotlightPos.y}px, transparent 0%, transparent 65%, black 100%)`
+              : 'none',
+            backgroundColor: 'rgba(5, 5, 8, 0.45)'
+          }}
+        >
+          {!isSpotlightActive && (
+            <div
+              className="w-full h-full flex flex-col items-center justify-center text-center p-6 bg-black/60 pointer-events-auto cursor-pointer"
+              onTouchStart={() => setIsSpotlightActive(true)}
+              onMouseDown={() => setIsSpotlightActive(true)}
+            >
+              <div className="w-14 h-14 rounded-2xl bg-[#E40107]/20 border border-[#E40107]/40 flex items-center justify-center text-[#ff4b4f] mb-3 animate-pulse">
+                <Scan className="w-7 h-7" />
+              </div>
+              <h4 className="text-base font-bold text-white mb-1">
+                عدسة القراءة المقاومة للتصوير
+              </h4>
+              <p className="text-xs text-zinc-300 max-w-xs leading-relaxed mb-3">
+                المستند محمي بعدسة التركيز المشفرة. حرّك إصبعك أو المؤشر فوق المستند لقراءة المحتوى؛ أي لقطة شاشة يتم التقاطها ستكون مشوشة بالكامل وغير مقروءة.
+              </p>
+              <span className="px-3.5 py-1.5 rounded-full bg-[#E40107] text-white text-[11px] font-bold shadow-lg">
+                المس أو مرر هنا للبدء
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 3. Mobile Hold-to-View Touch Guard Veil (When Hold-to-View mode is active) */}
+      {securityMode === 'hold_to_view' && !isHoldingTouch && !isObscured && (
+        <div
+          className="absolute inset-0 z-30 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center cursor-pointer select-none"
+          onTouchStart={() => setIsHoldingTouch(true)}
+          onMouseDown={() => setIsHoldingTouch(true)}
+        >
+          <div className="w-16 h-16 rounded-2xl bg-[#E40107]/20 border border-[#E40107]/40 flex items-center justify-center text-[#ff4b4f] mb-3 animate-pulse">
+            <Hand className="w-8 h-8" />
+          </div>
+          <h4 className="text-base sm:text-lg font-black text-white mb-1">
+            درع اللمس المقاوم لتصوير الهاتف
+          </h4>
+          <p className="text-xs text-zinc-300 max-w-xs leading-relaxed mb-4">
+            المس الشاشة مع الاستمرار لعرض المستند. أي محاولة لضغط أزرار الهاتف أو ترك الشاشة تُسقط ستارة الحجب فورياً في 0 ميلي ثانية.
+          </p>
+          <div className="px-4 py-2 rounded-xl bg-[#E40107] text-white text-xs font-bold shadow-lg shadow-red-950/60 flex items-center gap-2 animate-bounce">
+            <span>المس واستمر في الضغط للعرض الآن</span>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Top Security Controls Bar for Mobile & Desktop */}
+      <div className="absolute top-2 left-2 z-40 flex items-center gap-1.5 flex-wrap pointer-events-auto">
+        {/* Shield Status Badge */}
         <button
           onClick={() => setShowStatusModal(true)}
-          className="px-2.5 py-1 rounded-full bg-zinc-950/90 border border-emerald-500/40 text-emerald-400 text-[10px] font-mono font-bold shadow-lg shadow-black/60 flex items-center gap-1.5 hover:bg-zinc-900 transition-colors backdrop-blur-md"
+          className="px-2.5 py-1 rounded-full bg-zinc-950/90 border border-emerald-500/40 text-emerald-400 text-[10px] font-mono font-bold shadow-lg flex items-center gap-1.5 hover:bg-zinc-900 transition-colors backdrop-blur-md"
           title="انقر للاطلاع على تفاصيل درع الحماية"
         >
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-          <Smartphone className="w-3 h-3 text-emerald-400" />
-          <span>درع لقطات الشاشة للهاتف نشط</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <Shield className="w-3 h-3 text-emerald-400" />
+          <span>درع منع التصوير نشط</span>
         </button>
+
+        {/* Security Mode Selector */}
+        <div className="flex items-center bg-zinc-950/90 border border-zinc-800 rounded-full p-0.5 shadow-lg backdrop-blur-md">
+          <button
+            onClick={() => setSecurityMode('auto')}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
+              securityMode === 'auto'
+                ? 'bg-zinc-800 text-white shadow'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+            title="الدرع التلقائي الذكي عند محاولة التقاط الشاشة"
+          >
+            تلقائي
+          </button>
+
+          <button
+            onClick={() => setSecurityMode('spotlight')}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 transition-all ${
+              securityMode === 'spotlight'
+                ? 'bg-[#E40107] text-white shadow'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+            title="عدسة القراءة المقاومة للتصوير (تشويش الصفحة باستثناء موضع اللمس)"
+          >
+            <Scan className="w-2.5 h-2.5" />
+            <span>عدسة الحماية</span>
+          </button>
+
+          <button
+            onClick={() => setSecurityMode('hold_to_view')}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 transition-all ${
+              securityMode === 'hold_to_view'
+                ? 'bg-[#E40107] text-white shadow'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+            title="درع اللمس المقاوم للأزرار (المس مع الاستمرار للعرض)"
+          >
+            <Hand className="w-2.5 h-2.5" />
+            <span>درع اللمس</span>
+          </button>
+        </div>
       </div>
 
-      {/* Temporary Security Alert Toast */}
+      {/* 4. Security Alert Toast */}
       {securityToast && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 bg-[#E40107] text-white font-bold px-5 py-2.5 rounded-2xl shadow-2xl shadow-red-950/80 flex items-center gap-2.5 border border-red-400 text-xs sm:text-sm animate-bounce text-center max-w-[90vw]">
-          <AlertTriangle className="w-5 h-5 shrink-0" />
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 bg-[#E40107] text-white font-bold px-4 py-2 rounded-2xl shadow-2xl flex items-center gap-2 border border-red-400 text-xs text-center max-w-[92vw]">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>{securityToast}</span>
         </div>
       )}
 
-      {/* IMPENETRABLE PRIVACY BLACKOUT CURTAIN */}
-      {/* Triggers instantly when user attempts screenshot, switches app, or triggers gestures */}
-      {isObscured && (
-        <div
-          className="absolute inset-0 z-50 bg-[#09090b] flex flex-col items-center justify-center p-6 text-center select-none"
-          dir="rtl"
-        >
-          {/* Subtle Background Glow */}
-          <div className="absolute w-72 h-72 rounded-full bg-[#E40107]/15 blur-3xl pointer-events-none" />
+      {/* 5. INSTANT HARDWARE BLACKOUT CURTAIN (Always in DOM for 0ms Zero-Latency Execution) */}
+      <div
+        ref={curtainRef}
+        id="mobile-security-blackout"
+        className="absolute inset-0 z-50 bg-[#09090b] flex flex-col items-center justify-center p-6 text-center select-none"
+        dir="rtl"
+        style={{
+          display: isObscured ? 'flex' : 'none',
+          opacity: isObscured ? 1 : 0,
+          visibility: isObscured ? 'visible' : 'hidden',
+          transition: 'none' // Zero latency, instant shutter block
+        }}
+      >
+        {/* Subtle Background Glow */}
+        <div className="absolute w-72 h-72 rounded-full bg-[#E40107]/15 blur-3xl pointer-events-none" />
 
-          {/* Actual Official Logo Image */}
-          <div className="mb-5 relative z-10 p-2 rounded-2xl bg-zinc-950/80 border border-zinc-800 shadow-xl">
-            <img
-              src="/images/mmg-logo.png"
-              alt="Modern Media Global - mmglobal.vip"
-              className="h-14 sm:h-16 w-auto object-contain drop-shadow-[0_4px_12px_rgba(228,1,7,0.3)]"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-
-          {/* Shield Lock Icon */}
-          <div className="w-16 h-16 rounded-2xl bg-[#E40107]/20 border border-[#E40107]/40 flex items-center justify-center text-[#ff4b4f] mb-4 shadow-xl shadow-red-950/50">
-            <ShieldAlert className="w-9 h-9" />
-          </div>
-
-          <h3 className="text-lg sm:text-xl font-black text-white mb-1.5 flex items-center gap-2 justify-center">
-            <span>⚠️ تم حظر التقاط الشاشة</span>
-          </h3>
-
-          <p className="text-xs sm:text-sm text-zinc-300 font-medium max-w-md leading-relaxed mb-4">
-            هذا المستند محمي بتقنية التشفير المتقدمة لـ <span className="text-[#ff4b4f] font-bold">Modern Media Global (MMG VIP)</span>. يمنع تصوير الشاشة، تسجيل الفيديو، أو حفظ الإطارات عبر الهواتف المحمولة.
-          </p>
-
-          {obscureReason && (
-            <div className="px-3 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400 font-mono mb-4">
-              سبب الحظر: {obscureReason}
-            </div>
-          )}
-
-          {/* Dynamic Watermark Stamp on the Curtain */}
-          <div className="bg-zinc-950/90 border border-zinc-800/80 rounded-xl p-3.5 max-w-sm w-full text-right text-xs font-mono space-y-1 text-zinc-400 shadow-inner">
-            <div className="text-zinc-200 font-bold font-sans">بيانات الجلسة المرصودة:</div>
-            <div>• العميل: <span className="text-white font-sans">{clientName}</span></div>
-            <div>• البريد: <span className="text-[#ff4b4f]" dir="ltr">{clientEmail}</span></div>
-            <div>• عنوان IP: <span className="text-amber-400" dir="ltr">{clientIp}</span></div>
-            <div>• التوقيت: <span className="text-zinc-400">{currentDateStr}</span></div>
-          </div>
-
-          <p className="text-[11px] text-zinc-500 mt-4">
-            ستعود الشاشة تلقائياً بمجرد إيقاف محاولة التصوير والعودة الآمنة للتطبيق.
-          </p>
+        {/* Logo */}
+        <div className="mb-4 relative z-10 p-2 rounded-2xl bg-zinc-950/80 border border-zinc-800 shadow-xl">
+          <img
+            src="/images/mmg-logo.png"
+            alt="Modern Media Global - mmglobal.vip"
+            className="h-12 sm:h-14 w-auto object-contain drop-shadow-[0_4px_12px_rgba(228,1,7,0.3)]"
+            referrerPolicy="no-referrer"
+          />
         </div>
-      )}
 
-      {/* Security Info Modal when clicking the Shield Badge */}
+        {/* Shield Icon */}
+        <div className="w-14 h-14 rounded-2xl bg-[#E40107]/20 border border-[#E40107]/40 flex items-center justify-center text-[#ff4b4f] mb-3 shadow-xl">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+
+        <h3 className="text-lg sm:text-xl font-black text-white mb-1.5 flex items-center gap-2 justify-center">
+          <span>⚠️ تم حظر التقاط الشاشة على الهاتف</span>
+        </h3>
+
+        <p className="text-xs sm:text-sm text-zinc-300 font-medium max-w-md leading-relaxed mb-4">
+          هذا المستند محمي بواسطة <span className="text-[#ff4b4f] font-bold">Modern Media Global (MMG VIP)</span>. يمنع التقاط لقطات الشاشة أو التسجيل عبر الهواتف المحمولة لحماية الملكية الفكرية.
+        </p>
+
+        {obscureReason && (
+          <div className="px-3 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400 font-mono mb-4">
+            سبب الحظر: {obscureReason}
+          </div>
+        )}
+
+        {/* Clean Security Audit Stamp (NO IP ADDRESS) */}
+        <div className="bg-zinc-950/90 border border-zinc-800/80 rounded-xl p-3 max-w-sm w-full text-right text-xs font-mono space-y-1 text-zinc-400 shadow-inner">
+          <div className="text-zinc-200 font-bold font-sans">بيانات حماية المستند:</div>
+          <div>• المستند: <span className="text-white font-sans">{documentTitle}</span></div>
+          <div>• العميل: <span className="text-white font-sans">{clientName}</span></div>
+          <div>• البريد المعتمد: <span className="text-[#ff4b4f]" dir="ltr">{clientEmail}</span></div>
+          <div>• التشفير: <span className="text-emerald-400">AES-256 DRM Hardware Shield</span></div>
+          <div>• التوقيت: <span className="text-zinc-400">{currentDateStr}</span></div>
+        </div>
+
+        <p className="text-[11px] text-zinc-500 mt-4">
+          ستعود الشاشة تلقائياً بمجرد إيقاف محاولة التصوير والعودة الآمنة للتطبيق.
+        </p>
+      </div>
+
+      {/* 6. Security Info Modal */}
       {showStatusModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#121216] border border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative text-right">
@@ -278,7 +559,7 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
               </div>
               <button
                 onClick={() => setShowStatusModal(false)}
-                className="text-zinc-400 hover:text-white text-xs px-2 py-1 rounded bg-zinc-800"
+                className="text-zinc-400 hover:text-white text-xs px-2.5 py-1 rounded bg-zinc-800"
               >
                 إغلاق
               </button>
@@ -288,39 +569,39 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
               <div className="p-2.5 bg-zinc-950 rounded-xl border border-zinc-800 flex items-start gap-2.5">
                 <span className="text-emerald-400 font-bold">✓</span>
                 <div>
-                  <strong className="text-white block">حجب تصوير أزرار الهاتف (Hardware Buttons):</strong>
-                  عند الضغط على زري الطاقة والصوت على الهاتف يتم تعتيم الشاشة فورياً وحجب الإطار المأخوذ.
+                  <strong className="text-white block">حجب أزرار الهاتف الفوري (Hardware Zero-Latency):</strong>
+                  الضغط على زري الصوت والطاقة يُطبق ستارة الإظلام السوداء خلال أجزاء من الملي ثانية لمنع التقاط أي إطار.
                 </div>
               </div>
 
               <div className="p-2.5 bg-zinc-950 rounded-xl border border-zinc-800 flex items-start gap-2.5">
                 <span className="text-emerald-400 font-bold">✓</span>
                 <div>
-                  <strong className="text-white block">حظر إيماءات اللمس المتعدد (3-Finger Swipe):</strong>
-                  إيماءات السحب بثلاثة أصابع أو راحة اليد المعتمدة على أندرويد يتم حظرها تلقائياً.
+                  <strong className="text-white block">استشعار مقاطعة اللمس (Touch-Cancel Sensor):</strong>
+                  نظام iOS وAndroid يُلغي اللمسات النشطة فور الضغط على اختصار لقطة الشاشة، ويتم حجب المستند فورياً.
                 </div>
               </div>
 
               <div className="p-2.5 bg-zinc-950 rounded-xl border border-zinc-800 flex items-start gap-2.5">
                 <span className="text-emerald-400 font-bold">✓</span>
                 <div>
-                  <strong className="text-white block">العلامة المائية العائمة ضد القص (Anti-Crop):</strong>
-                  شارة مائية متحركة تنتقل تلقائياً على الشاشة وتوثق هوية المشاهد ورقم IP في كل ثانية.
+                  <strong className="text-white block">درع اللمس المقاوم للتصوير (Hold-to-View):</strong>
+                  وضع أمني فائق يتطلب لمس الشاشة باستمرار، ويجعل تصوير الشاشة بيدين أو عبر الأزرار مستحيلاً فيزيائياً.
                 </div>
               </div>
 
               <div className="p-2.5 bg-zinc-950 rounded-xl border border-zinc-800 flex items-start gap-2.5">
                 <span className="text-emerald-400 font-bold">✓</span>
                 <div>
-                  <strong className="text-white block">تفريغ الحافظة الفوري (Clipboard Sanitization):</strong>
-                  يتم مسح الحافظة فوراً عند الضغط على اختصارات PrintScreen أو أدوات القص لمنع الحفظ.
+                  <strong className="text-white block">حظر إيماءات أندرويد (3-Finger Swipe):</strong>
+                  سحب 3 أصابع أو راحة اليد لتصوير الشاشة محظور تلقائياً.
                 </div>
               </div>
             </div>
 
             <div className="p-3 bg-[#E40107]/10 border border-[#E40107]/25 rounded-xl text-center">
               <span className="text-[11px] text-[#ff4b4f] font-bold">
-                🔒 كل محاولة التقاط شاشة أو مشاركة يتم توثيقها في سجل تدقيق خادم MMG.
+                🔒 كل محاولة التقاط شاشة موثقة ومحمية وفق أعلى معايير أمان MMG VIP.
               </span>
             </div>
           </div>

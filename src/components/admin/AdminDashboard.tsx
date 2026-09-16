@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   ClientUser,
   Project,
@@ -38,7 +38,13 @@ import {
   ShieldCheck,
   Smartphone,
   Send,
-  FileCode
+  FileCode,
+  Upload,
+  UploadCloud,
+  Film,
+  FileUp,
+  AlertCircle,
+  FileCheck
 } from 'lucide-react';
 import {
   cpanelMysqlSchema,
@@ -123,8 +129,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     status: 'active' as 'active' | 'in-progress' | 'completed'
   });
 
-  // New Document Modal state
+  // New Document Modal state with Real File Upload Support
   const [showAddDocModal, setShowAddDocModal] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFilePreviewUrl, setSelectedFilePreviewUrl] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+
   const [newDocForm, setNewDocForm] = useState({
     projectId: projects[0]?.id || '',
     title: '',
@@ -189,41 +203,99 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     });
   };
 
-  const handleCreateDocument = (e: React.FormEvent) => {
+  // Format file size helper
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+  };
+
+  // Handle incoming file selection (drag & drop or click)
+  const processIncomingFile = (file: File) => {
+    setUploadError(null);
+    const fileName = file.name;
+    const fileExt = fileName.split('.').pop()?.toLowerCase() || '';
+    const mime = file.type.toLowerCase();
+
+    // Auto-detect file type based on extension & mime
+    let detectedType: FileType = newDocForm.fileType;
+    if (fileExt === 'pdf' || mime.includes('pdf')) {
+      detectedType = 'pdf';
+    } else if (
+      fileExt === 'pptx' ||
+      fileExt === 'ppt' ||
+      fileExt === 'key' ||
+      fileExt === 'odp' ||
+      mime.includes('presentation') ||
+      mime.includes('powerpoint')
+    ) {
+      detectedType = 'presentation';
+    } else if (
+      fileExt === 'mp4' ||
+      fileExt === 'mov' ||
+      fileExt === 'webm' ||
+      fileExt === 'mkv' ||
+      fileExt === 'avi' ||
+      mime.startsWith('video/')
+    ) {
+      detectedType = 'video';
+    }
+
+    // Generate Object URL for immediate playback/preview
+    const objectUrl = URL.createObjectURL(file);
+    if (selectedFilePreviewUrl) {
+      URL.revokeObjectURL(selectedFilePreviewUrl);
+    }
+
+    setSelectedFile(file);
+    setSelectedFilePreviewUrl(objectUrl);
+
+    // Auto-fill title if empty or clean up extension
+    const baseName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
+    setNewDocForm((prev) => ({
+      ...prev,
+      fileType: detectedType,
+      title: prev.title.trim() ? prev.title : baseName,
+      pageCount: detectedType === 'pdf' ? (prev.pageCount || 6) : (detectedType === 'presentation' ? 8 : undefined),
+      duration: detectedType === 'video' ? (prev.duration || '03:45') : undefined
+    }));
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      processIncomingFile(e.target.files[0]);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    if (!newDocForm.title || !newDocForm.projectId) return;
+    setIsDragOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      processIncomingFile(e.dataTransfer.files[0]);
+    }
+  };
 
-    const newDoc: DocumentItem = {
-      id: `doc-${Date.now()}`,
-      projectId: newDocForm.projectId,
-      title: newDocForm.title,
-      titleEn: newDocForm.title,
-      description: newDocForm.description || 'مستند مخصص محمي للعميل.',
-      descriptionEn: newDocForm.description || 'Client document.',
-      fileType: newDocForm.fileType,
-      fileSize: newDocForm.fileType === 'video' ? '45 MB' : '3.4 MB',
-      pageCount: newDocForm.pageCount,
-      duration: newDocForm.duration,
-      uploadedAt: new Date().toISOString().split('T')[0],
-      isConfidential: true,
-      watermarkEnabled: true,
-      downloadRestricted: true,
-      viewsCount: 0,
-      contentPages: [
-        `صفحة 1: مستند جديد معتمد: ${newDocForm.title}`,
-        'صفحة 2: الشروط والتحليلات وبيانات المشروع السرية.'
-      ],
-      slides: [
-        {
-          title: newDocForm.title,
-          subtitle: newDocForm.description,
-          content: ['الهدف الأول', 'خطة التنفيذ', 'المؤشرات']
-        }
-      ],
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
-    };
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
 
-    onAddDocument(newDoc);
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const resetDocModal = () => {
+    if (selectedFilePreviewUrl) {
+      URL.revokeObjectURL(selectedFilePreviewUrl);
+    }
+    setSelectedFile(null);
+    setSelectedFilePreviewUrl(null);
+    setUploadProgress(0);
+    setIsUploading(false);
+    setUploadError(null);
+    setIsDragOver(false);
     setShowAddDocModal(false);
     setNewDocForm({
       projectId: projects[0]?.id || '',
@@ -233,6 +305,92 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       pageCount: 5,
       duration: '02:30'
     });
+  };
+
+  const handleCreateDocument = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDocForm.title.trim() || !newDocForm.projectId) {
+      setUploadError('يرجى كتابة عنوان للملف واختيار المشروع التابع له.');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(25);
+
+    // Simulate encryption and watermark embedding pipeline
+    await new Promise((r) => setTimeout(r, 200));
+    setUploadProgress(65);
+    await new Promise((r) => setTimeout(r, 200));
+    setUploadProgress(100);
+
+    const docId = `doc-${Date.now()}`;
+    const fileSizeFormatted = selectedFile ? formatBytes(selectedFile.size) : (newDocForm.fileType === 'video' ? '45 MB' : '3.4 MB');
+
+    // Build specialized slides or content pages for preview
+    const cleanTitle = newDocForm.title.trim();
+    const cleanDesc = newDocForm.description.trim() || 'مستند استراتيجي محمي وخاص ببوابة MMG VIP.';
+
+    const newDoc: DocumentItem = {
+      id: docId,
+      projectId: newDocForm.projectId,
+      title: cleanTitle,
+      titleEn: cleanTitle,
+      description: cleanDesc,
+      descriptionEn: cleanDesc,
+      fileType: newDocForm.fileType,
+      fileSize: fileSizeFormatted,
+      pageCount: newDocForm.fileType === 'video' ? undefined : (newDocForm.pageCount || (newDocForm.fileType === 'presentation' ? 6 : 5)),
+      duration: newDocForm.fileType === 'video' ? (newDocForm.duration || '03:15') : undefined,
+      uploadedAt: new Date().toISOString().split('T')[0],
+      isConfidential: true,
+      watermarkEnabled: true,
+      downloadRestricted: true,
+      viewsCount: 0,
+      uploadedFileUrl: selectedFilePreviewUrl || undefined,
+      originalFileName: selectedFile?.name || `${cleanTitle}.${newDocForm.fileType === 'pdf' ? 'pdf' : newDocForm.fileType === 'video' ? 'mp4' : 'pptx'}`,
+      mimeType: selectedFile?.type,
+      contentPages: [
+        `صفحة 1: ملف معتمد مرفوع حديثاً: ${cleanTitle}`,
+        `صفحة 2: بيانات المشروع والتحليلات السرية - ${cleanDesc}`,
+        `صفحة 3: دراسة التكاليف والجدول الزمني لتنفيذ المبادرة الإعلامية.`,
+        `صفحة 4: مؤشرات الأداء والتقارير الرقابية الصادرة عن Modern Media Global.`,
+        `صفحة 5: الاعتمادات الرسمية والشروط القانونية المرفقة بالملف.`
+      ],
+      slides: [
+        {
+          title: cleanTitle,
+          subtitle: cleanDesc,
+          content: [
+            'الرؤية والهدف الأساسي للمشروع الاستراتيجي',
+            'خطة العمل والجدول الزمني المعتمد لـ Modern Media Global',
+            'معايير الحماية والأمان وتدابير منع التسريب'
+          ]
+        },
+        {
+          title: 'مؤشرات الأداء والتنفيذ الفعلي',
+          subtitle: 'تحليل المعطيات والأهداف المرحلية',
+          content: [
+            'المرحلة الأولى: التأسيس والبناء الرقمي',
+            'المرحلة الثانية: الإطلاق والتوزيع الحصري',
+            'المرحلة الثالثة: قياس الأثر والعائد الاستثماري'
+          ]
+        },
+        {
+          title: 'التوصيات والخطوات القادمة',
+          subtitle: 'اعتماد فريق الإدارة التنفيذية لـ MMG',
+          content: [
+            'تفعيل التنبيهات الفورية عند استعراض العميل للشرائح',
+            'تطبيق العلامة المائية الشفافة لحماية الملكية الفكرية',
+            'الربط المباشر مع سجل النشاط والأمان'
+          ]
+        }
+      ],
+      videoUrl: selectedFilePreviewUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+    };
+
+    onAddDocument(newDoc);
+    setIsUploading(false);
+    resetDocModal();
   };
 
   const handleCreateProject = (e: React.FormEvent) => {
@@ -1183,9 +1341,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="flex flex-wrap gap-1.5 mt-2 text-[10px] text-zinc-400">
                   <span>المتغيرات المدعومة:</span>
                   <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-[#ff4b4f] font-mono">{'{email}'}</code>
-                  <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-[#ff4b4f] font-mono">{'{ip}'}</code>
-                  <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-[#ff4b4f] font-mono">{'{date}'}</code>
                   <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-[#ff4b4f] font-mono">{'{name}'}</code>
+                  <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-[#ff4b4f] font-mono">{'{date}'}</code>
+                  <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-500 font-mono" title="عنوان IP (معطل افتراضياً)">{'{ip}'}</code>
                 </div>
               </div>
 
@@ -1291,11 +1449,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={localWm.dynamicFloatingPill !== false}
+                    checked={localWm.showIp === true}
+                    onChange={(e) => setLocalWm({ ...localWm, showIp: e.target.checked })}
+                    className="rounded accent-[#E40107]"
+                  />
+                  <span>إظهار عنوان IP في العلامة (معطّل افتراضياً لعدم التشويش)</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={localWm.dynamicFloatingPill === true}
                     onChange={(e) => setLocalWm({ ...localWm, dynamicFloatingPill: e.target.checked })}
                     className="rounded accent-[#E40107]"
                   />
-                  <span>الشارة المائية العائمة المتحركة ضد القص (Anti-Crop Floating Pill)</span>
+                  <span>شارة الأمان السفلية الثابتة (Bottom DRM Security Badge)</span>
                 </label>
 
                 <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
@@ -1694,14 +1862,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       )}
 
-      {/* MODAL: ADD DOCUMENT */}
+      {/* MODAL: ADD DOCUMENT WITH FILE UPLOAD */}
       {showAddDocModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#121216] border border-zinc-800 rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <h3 className="text-base font-bold text-white mb-4">رفع ملف محمي جديد لبوابة MMG VIP</h3>
-            <form onSubmit={handleCreateDocument} className="space-y-3 text-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-[#121216] border border-zinc-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#E40107]/20 border border-[#E40107]/40 flex items-center justify-center text-[#ff4b4f]">
+                  <UploadCloud className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm md:text-base font-bold text-white">رفع ملف محمي جديد لبوابة MMG VIP</h3>
+                  <p className="text-[11px] text-zinc-400">دعم ملفات PDF، العروض التقديمية، ومقاطع الفيديو المحمية</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={resetDocModal}
+                className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800/80 transition-colors"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateDocument} className="space-y-4 text-xs">
+              {uploadError && (
+                <div className="p-3 bg-red-950/50 border border-red-800/80 rounded-xl text-red-300 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{uploadError}</span>
+                </div>
+              )}
+
+              {/* PROJECT SELECTION */}
               <div>
-                <label className="block text-zinc-300 mb-1 font-semibold">المشروع التابع له</label>
+                <label className="block text-zinc-300 mb-1.5 font-semibold">المشروع التابع له</label>
                 <select
                   value={newDocForm.projectId}
                   onChange={(e) => setNewDocForm({ ...newDocForm, projectId: e.target.value })}
@@ -1713,19 +1907,148 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </select>
               </div>
 
+              {/* FILE TYPE SELECTION TABS */}
               <div>
-                <label className="block text-zinc-300 mb-1 font-semibold">نوع الملف</label>
-                <select
-                  value={newDocForm.fileType}
-                  onChange={(e) => setNewDocForm({ ...newDocForm, fileType: e.target.value as FileType })}
-                  className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-[#E40107]"
-                >
-                  <option value="pdf">مستند PDF (محمي بتقنية PDF.js)</option>
-                  <option value="presentation">عرض تقديمي (Slide Deck)</option>
-                  <option value="video">فيديو مرئي محمي (Video)</option>
-                </select>
+                <label className="block text-zinc-300 mb-1.5 font-semibold">نوع الملف المصنّف</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewDocForm({ ...newDocForm, fileType: 'pdf' })}
+                    className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border text-center transition-all ${
+                      newDocForm.fileType === 'pdf'
+                        ? 'bg-[#E40107]/15 border-[#E40107] text-white shadow-sm'
+                        : 'bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                    }`}
+                  >
+                    <FileText className={`w-4 h-4 ${newDocForm.fileType === 'pdf' ? 'text-[#ff4b4f]' : ''}`} />
+                    <span className="font-bold text-[11px]">مستند PDF</span>
+                    <span className="text-[9px] text-zinc-500">.pdf</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setNewDocForm({ ...newDocForm, fileType: 'presentation' })}
+                    className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border text-center transition-all ${
+                      newDocForm.fileType === 'presentation'
+                        ? 'bg-[#E40107]/15 border-[#E40107] text-white shadow-sm'
+                        : 'bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                    }`}
+                  >
+                    <Presentation className={`w-4 h-4 ${newDocForm.fileType === 'presentation' ? 'text-[#ff4b4f]' : ''}`} />
+                    <span className="font-bold text-[11px]">عرض تقديمي</span>
+                    <span className="text-[9px] text-zinc-500">.pptx, .key</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setNewDocForm({ ...newDocForm, fileType: 'video' })}
+                    className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border text-center transition-all ${
+                      newDocForm.fileType === 'video'
+                        ? 'bg-[#E40107]/15 border-[#E40107] text-white shadow-sm'
+                        : 'bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                    }`}
+                  >
+                    <Video className={`w-4 h-4 ${newDocForm.fileType === 'video' ? 'text-[#ff4b4f]' : ''}`} />
+                    <span className="font-bold text-[11px]">فيديو مرئي</span>
+                    <span className="text-[9px] text-zinc-500">.mp4, .mov</span>
+                  </button>
+                </div>
               </div>
 
+              {/* FILE UPLOAD DROPZONE */}
+              <div>
+                <label className="block text-zinc-300 mb-1.5 font-semibold flex items-center justify-between">
+                  <span>رفع الملف الفعلي من جهازك</span>
+                  <span className="text-[10px] text-zinc-400 font-normal">
+                    {newDocForm.fileType === 'pdf' && 'ملفات PDF حتى 100MB'}
+                    {newDocForm.fileType === 'presentation' && 'عروض PowerPoint / Keynote'}
+                    {newDocForm.fileType === 'video' && 'مقاطع MP4, MOV, WebM'}
+                  </span>
+                </label>
+
+                {/* Hidden File Input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={handleFileInputChange}
+                  accept={
+                    newDocForm.fileType === 'pdf'
+                      ? 'application/pdf,.pdf'
+                      : newDocForm.fileType === 'presentation'
+                      ? '.pptx,.ppt,.key,.odp,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation'
+                      : 'video/mp4,video/quicktime,video/webm,video/x-matroska,.mp4,.mov,.webm,.mkv'
+                  }
+                  className="hidden"
+                />
+
+                {/* Dropzone container */}
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all ${
+                    isDragOver
+                      ? 'border-[#E40107] bg-[#E40107]/10'
+                      : selectedFile
+                      ? 'border-emerald-600/80 bg-emerald-950/20 hover:bg-emerald-950/30'
+                      : 'border-zinc-700 hover:border-zinc-500 bg-zinc-950/60 hover:bg-zinc-900/60'
+                  }`}
+                >
+                  {selectedFile ? (
+                    <div className="flex items-center justify-between gap-3 text-right">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                          {newDocForm.fileType === 'video' ? (
+                            <Film className="w-5 h-5" />
+                          ) : newDocForm.fileType === 'presentation' ? (
+                            <Presentation className="w-5 h-5" />
+                          ) : (
+                            <FileCheck className="w-5 h-5" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-white font-bold text-xs truncate max-w-[220px]">
+                            {selectedFile.name}
+                          </p>
+                          <p className="text-zinc-400 text-[10px] mt-0.5">
+                            الحجم: {formatBytes(selectedFile.size)} • النوع: {selectedFile.type || newDocForm.fileType.toUpperCase()}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (selectedFilePreviewUrl) URL.revokeObjectURL(selectedFilePreviewUrl);
+                          setSelectedFile(null);
+                          setSelectedFilePreviewUrl(null);
+                        }}
+                        className="text-zinc-400 hover:text-red-400 p-1.5 rounded-lg hover:bg-zinc-800 transition-colors"
+                        title="إزالة الملف"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-2">
+                      <div className="w-11 h-11 rounded-2xl bg-zinc-900 border border-zinc-700 flex items-center justify-center text-zinc-300 mb-2 group-hover:scale-105 transition-transform">
+                        <FileUp className="w-5 h-5 text-[#E40107]" />
+                      </div>
+                      <p className="text-white font-bold text-xs mb-1">
+                        اسحب الملف وأفلته هنا أو <span className="text-[#ff4b4f] underline">تصفّح جهازك</span>
+                      </p>
+                      <p className="text-zinc-400 text-[10px]">
+                        {newDocForm.fileType === 'pdf' && 'يدعم PDF مع ترقيم الصفحات وتطبيق الأمان التلقائي'}
+                        {newDocForm.fileType === 'presentation' && 'يدعم عروض الشرائح والملخصات التنفيذية'}
+                        {newDocForm.fileType === 'video' && 'يدعم تشغيل الفيديو المباشر ومراقبة معدل الاستعراض'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* TITLE */}
               <div>
                 <label className="block text-zinc-300 mb-1 font-semibold">عنوان الملف</label>
                 <input
@@ -1738,6 +2061,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 />
               </div>
 
+              {/* DESCRIPTION */}
               <div>
                 <label className="block text-zinc-300 mb-1 font-semibold">وصف المستند</label>
                 <textarea
@@ -1749,24 +2073,77 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 />
               </div>
 
+              {/* DYNAMIC METRICS: PAGES OR DURATION */}
+              {newDocForm.fileType === 'video' ? (
+                <div>
+                  <label className="block text-zinc-300 mb-1 font-semibold">المدة التقديرية (دقيقة:ثانية)</label>
+                  <input
+                    type="text"
+                    value={newDocForm.duration || '03:15'}
+                    onChange={(e) => setNewDocForm({ ...newDocForm, duration: e.target.value })}
+                    placeholder="03:15"
+                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-[#E40107]"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-zinc-300 mb-1 font-semibold">
+                    {newDocForm.fileType === 'presentation' ? 'عدد الشرائح' : 'عدد الصفحات'}
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={200}
+                    value={newDocForm.pageCount || (newDocForm.fileType === 'presentation' ? 6 : 5)}
+                    onChange={(e) => setNewDocForm({ ...newDocForm, pageCount: parseInt(e.target.value) || 1 })}
+                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-[#E40107]"
+                  />
+                </div>
+              )}
+
+              {/* UPLOAD PROGRESS BAR IF ACTIVE */}
+              {isUploading && (
+                <div className="p-3 bg-zinc-950 rounded-xl border border-zinc-800 space-y-1.5">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-zinc-300 font-medium">جاري تشفير الملف وتطبيق العلامة المائية...</span>
+                    <span className="text-[#ff4b4f] font-mono font-bold">{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-[#E40107] h-full transition-all duration-200"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="p-3 bg-zinc-950 rounded-xl border border-zinc-800 text-[11px] text-emerald-400 flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 shrink-0 text-[#E40107]" />
-                <span>سيتم دمج العلامة المائية وتفعيل حظر التحميل فور حفظ المستند.</span>
+                <span>سيتم دمج العلامة المائية وحظر لقطات الشاشة وتتبع وقت القراءة فور حفظ الملف.</span>
               </div>
 
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2 pt-2 border-t border-zinc-800">
                 <button
                   type="button"
-                  onClick={() => setShowAddDocModal(false)}
-                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2.5 rounded-xl font-medium transition-colors"
+                  disabled={isUploading}
+                  onClick={resetDocModal}
+                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2.5 rounded-xl font-medium transition-colors disabled:opacity-50"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-[#E40107] hover:bg-[#c90005] text-white font-bold py-2.5 rounded-xl transition-colors shadow-lg shadow-red-950/40"
+                  disabled={isUploading}
+                  className="flex-1 bg-[#E40107] hover:bg-[#c90005] text-white font-bold py-2.5 rounded-xl transition-colors shadow-lg shadow-red-950/40 flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  حفظ وحماية الملف
+                  {isUploading ? (
+                    <span>جاري التشفير والحفظ...</span>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>حفظ وتأمين الملف</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

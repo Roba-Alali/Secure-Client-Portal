@@ -79,7 +79,7 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
         pagesViewed: 1,
         maxPageReached: 1,
         timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-        watermarkApplied: `${client.email} | ${client.ipAddress || '197.34.12.88'}`
+        watermarkApplied: `${client.email} | MMG VIP`
       };
 
       onRecordView(initialLog, alertNotif);
@@ -103,7 +103,7 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
       pagesViewed: currentSlide + 1,
       maxPageReached: currentSlide + 1,
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      watermarkApplied: `${client.email} | ${client.ipAddress || '197.34.12.88'}`
+      watermarkApplied: `${client.email} | MMG VIP`
     };
     onRecordView(finalLog);
     onClose();
@@ -174,6 +174,11 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
                 <div className="flex items-center gap-2 text-xs text-[#ff4b4f] font-bold uppercase tracking-wider">
                   <PieChart className="w-4 h-4 text-[#E40107]" />
                   <span>MMG PRESENTATION • SLIDE {currentSlide + 1}</span>
+                  {document.originalFileName && (
+                    <span className="hidden sm:inline-block text-[10px] text-zinc-400 font-normal lowercase bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">
+                      ({document.originalFileName})
+                    </span>
+                  )}
                 </div>
                 <div className="text-xs font-mono text-zinc-300 bg-zinc-950 px-2.5 py-1 rounded-lg border border-zinc-800">
                   {client.email}
