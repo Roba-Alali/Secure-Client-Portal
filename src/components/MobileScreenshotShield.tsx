@@ -128,8 +128,8 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
 
     // 4. Hold blackout briefly so screenshot is solid black, then allow return
     unblackoutTimerRef.current = setTimeout(() => {
-      // If the user still has notifications shade pulled down or window is blurred, stay black!
-      if (!document.hasFocus() || document.hidden || document.visibilityState === 'hidden') {
+      // Only keep hidden if document is currently hidden (e.g., in background)
+      if (document.hidden || document.visibilityState === 'hidden') {
         return;
       }
       if (curtainRef.current) {
@@ -144,28 +144,22 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
         contentRef.current.style.filter = 'none';
       }
       setIsObscured(false);
-      blackoutCooldownRef.current = Date.now() + 1000;
-    }, 1800);
+      blackoutCooldownRef.current = Date.now() + 800;
+    }, 1200);
   }, [enabled, onSecurityEvent]);
 
-  // Global Hardware Shutter & Notification Shade / Quick Settings Protection Listeners
+  // Global Hardware Shutter & Screenshot Protection Listeners
   useEffect(() => {
     if (!enabled) return;
 
-    // 1. Visibility Change & Page Hide (triggered when OS captures snapshot or switches app or opens shade)
+    // 1. Visibility Change: Trigger blackout when app/tab is hidden; auto-restore when user returns
     const handleVisibilityChange = () => {
-      if (Date.now() < blackoutCooldownRef.current) return;
       if (document.hidden || document.visibilityState === 'hidden') {
-        executeSynchronousBlackout('تغيير نافذة التطبيق أو سحب قائمة الإشعارات', 'visibility_hidden');
+        executeSynchronousBlackout('سحب قائمة الإشعارات أو مغادرة التطبيق', 'visibility_hidden');
+      } else if (document.visibilityState === 'visible') {
+        // Automatically restore content immediately upon returning
+        handleManualRestore();
       }
-    };
-
-    // 2. Window Blur (triggered when user leaves window or pulls quick shade)
-    const handleWindowBlur = () => {
-      if (Date.now() < blackoutCooldownRef.current) return;
-      // If user is just touching or scrolling inside the page, do NOT trigger false blur
-      if (isTouchingRef.current) return;
-      executeSynchronousBlackout('حظر لقطة الشاشة: سحب القائمة المنسدلة أو ضغط أزرار الهاتف', 'window_blur');
     };
 
     const handlePageHide = () => {
@@ -178,11 +172,10 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
       executeSynchronousBlackout('تجميد حالة الصفحة من نظام التشغيل', 'page_freeze');
     };
 
-    // 3. TouchCancel / PointerCancel:
-    // When hardware screenshot buttons (Power+Volume) are pressed simultaneously, mobile OS cancels active touches!
+    // 2. Hardware Screenshot Keys & Buttons:
+    // When Power+Volume buttons are pressed simultaneously on mobile, OS cancels active touches
     const handleTouchCancel = () => {
       if (Date.now() < blackoutCooldownRef.current) return;
-      // Only trigger if this was an actual active touch that got aborted
       if (isTouchingRef.current) {
         isTouchingRef.current = false;
         executeSynchronousBlackout('حظر لقطة شاشة الهاتف عبر مقاطعة اللمس بأزرار الجهاز', 'touch_cancel');
@@ -190,33 +183,20 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
       }
     };
 
-    // 4. Android Dropdown Notification Shade Detection via Window Resize:
-    // Only flag substantial changes that occur without user touch scrolling
+    // 3. Android Dropdown Notification Shade Detection via Window Resize:
     const handleResize = () => {
       if (Date.now() < blackoutCooldownRef.current) return;
       const currentHeight = window.innerHeight;
       const heightDelta = Math.abs(currentHeight - lastHeightRef.current);
       lastHeightRef.current = currentHeight;
 
-      // When the full Android notification shade or quick settings menu drops down, height shrinks significantly (> 160px)
-      if (heightDelta > 160 && !isTouchingRef.current) {
+      // When the full Android notification shade or quick settings menu drops down significantly (> 200px)
+      if (heightDelta > 200 && !isTouchingRef.current && (document.hidden || document.visibilityState === 'hidden')) {
         executeSynchronousBlackout('رصد سحب القائمة المنسدلة / شريط النظام', 'notification_shade_pulldown');
       }
     };
 
-    // 5. Top-Edge Shade Swipe Detection:
-    // Swiping from the extreme top edge (< 12px) where the OS status bar resides
-    const handleGlobalTouchMove = (e: TouchEvent) => {
-      if (Date.now() < blackoutCooldownRef.current) return;
-      if (e.touches && e.touches.length > 0) {
-        const touch = e.touches[0];
-        if (touch.clientY < 12) {
-          executeSynchronousBlackout('محاولة سحب القائمة المنسدلة لتصوير الشاشة', 'top_edge_shade_swipe');
-        }
-      }
-    };
-
-    // 6. Print Screen & System Shortcuts
+    // 4. Print Screen & Desktop Screenshot System Shortcuts
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'PrintScreen' || e.code === 'PrintScreen' || e.keyCode === 44) {
         e.preventDefault();
@@ -253,52 +233,27 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
       }
     };
 
-    // 7. MouseLeave on Document (Catches Desktop Snipping Tools)
-    const handleMouseLeave = (e: MouseEvent) => {
-      if (Date.now() < blackoutCooldownRef.current) return;
-      if (e.clientY <= 0 || e.clientX <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight) {
-        executeSynchronousBlackout('حظر أداة التقاط وقص الشاشة (خروج المؤشر من النافذة)', 'snipping_tool_exit');
-      }
-    };
-
-    // 8. BeforePrint event (browser print to PDF / save screenshot)
+    // 5. BeforePrint event (browser print to PDF / save screenshot)
     const handleBeforePrint = () => {
       executeSynchronousBlackout('حظر طباعة أو حفظ المستند كصورة', 'before_print');
     };
 
-    // 9. Periodic focus check (only when user is not actively interacting)
-    const focusInterval = setInterval(() => {
-      if (Date.now() < blackoutCooldownRef.current) return;
-      if (!isTouchingRef.current && (document.hidden || document.visibilityState === 'hidden')) {
-        if (!isObscured) {
-          executeSynchronousBlackout('فقدان تركيز النافذة بسبب القائمة المنسدلة أو أداة خارجية', 'stealth_focus_loss');
-        }
-      }
-    }, 600);
-
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleWindowBlur);
     window.addEventListener('pagehide', handlePageHide);
     document.addEventListener('freeze', handleFreeze);
     window.addEventListener('touchcancel', handleTouchCancel, { passive: true });
     window.addEventListener('pointercancel', handleTouchCancel, { passive: true });
-    window.addEventListener('touchmove', handleGlobalTouchMove, { passive: true });
-    document.addEventListener('mouseleave', handleMouseLeave);
     window.addEventListener('resize', handleResize);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('beforeprint', handleBeforePrint);
 
     return () => {
-      clearInterval(focusInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleWindowBlur);
       window.removeEventListener('pagehide', handlePageHide);
       document.removeEventListener('freeze', handleFreeze);
       window.removeEventListener('touchcancel', handleTouchCancel);
       window.removeEventListener('pointercancel', handleTouchCancel);
-      window.removeEventListener('touchmove', handleGlobalTouchMove);
-      document.removeEventListener('mouseleave', handleMouseLeave);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
@@ -307,7 +262,7 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
         clearTimeout(unblackoutTimerRef.current);
       }
     };
-  }, [enabled, executeSynchronousBlackout, triggerToast, isObscured]);
+  }, [enabled, executeSynchronousBlackout, triggerToast, isObscured, handleManualRestore]);
 
   // Multi-Touch Gesture Detection & Touch Handling
   const handleTouchStart = (e: React.TouchEvent) => {

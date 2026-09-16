@@ -245,12 +245,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     // Generate Object URL for immediate playback/preview
     const objectUrl = URL.createObjectURL(file);
-    if (selectedFilePreviewUrl) {
-      URL.revokeObjectURL(selectedFilePreviewUrl);
-    }
-
     setSelectedFile(file);
     setSelectedFilePreviewUrl(objectUrl);
+
+    // If file is under 12MB, read as Base64 Data URL for persistent storage
+    if (file.size < 12 * 1024 * 1024) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        if (ev.target?.result && typeof ev.target.result === 'string') {
+          setSelectedFilePreviewUrl(ev.target.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
 
     // Auto-fill title if empty or clean up extension
     const baseName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
@@ -286,9 +293,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setIsDragOver(false);
   };
 
-  const resetDocModal = () => {
-    if (selectedFilePreviewUrl) {
-      URL.revokeObjectURL(selectedFilePreviewUrl);
+  const resetDocModal = (keepObjectUrl = false) => {
+    // Only revoke if user explicitly cancels upload without creating doc
+    if (!keepObjectUrl && selectedFilePreviewUrl && selectedFilePreviewUrl.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(selectedFilePreviewUrl);
+      } catch {
+        // ignore
+      }
     }
     setSelectedFile(null);
     setSelectedFilePreviewUrl(null);
