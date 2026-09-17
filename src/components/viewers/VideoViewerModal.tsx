@@ -219,7 +219,12 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
 
           <video
             ref={videoRef}
-            src={resolvedVideoUrl || document.uploadedFileUrl || document.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'}
+            src={
+              resolvedVideoUrl ||
+              (document.uploadedFileUrl && !document.uploadedFileUrl.startsWith('indexeddb://') ? document.uploadedFileUrl : null) ||
+              document.videoUrl ||
+              'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+            }
             className="w-full h-full object-contain"
             onTimeUpdate={handleTimeUpdate}
             onEnded={() => setIsPlaying(false)}

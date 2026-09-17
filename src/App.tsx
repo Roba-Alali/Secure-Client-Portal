@@ -122,7 +122,29 @@ export default function App() {
     const unsubDocs = listenToFirestoreDocuments((remoteDocs) => {
       if (remoteDocs && remoteDocs.length > 0) {
         setDocuments((prevDocs) => {
-          const merged = [...remoteDocs];
+          const merged = remoteDocs.map((remoteDoc) => {
+            const localDoc = prevDocs.find((d) => d.id === remoteDoc.id);
+            if (localDoc) {
+              const hasWorkingLocalUrl =
+                localDoc.uploadedFileUrl &&
+                !localDoc.uploadedFileUrl.startsWith('indexeddb://');
+              return {
+                ...remoteDoc,
+                uploadedFileUrl: hasWorkingLocalUrl
+                  ? localDoc.uploadedFileUrl
+                  : remoteDoc.uploadedFileUrl,
+                extractedText: localDoc.extractedText || remoteDoc.extractedText,
+                extractedHtml: localDoc.extractedHtml || remoteDoc.extractedHtml,
+                rawBase64: localDoc.rawBase64 || remoteDoc.rawBase64,
+                contentPages: (localDoc.contentPages && localDoc.contentPages.length > 0)
+                  ? localDoc.contentPages
+                  : remoteDoc.contentPages,
+                pageCount: localDoc.pageCount || remoteDoc.pageCount
+              };
+            }
+            return remoteDoc;
+          });
+
           for (const localDoc of prevDocs) {
             if (!merged.some((d) => d.id === localDoc.id)) {
               merged.push(localDoc);
@@ -396,6 +418,7 @@ export default function App() {
                 onDeleteDocument={handleDeleteDocument}
                 onMarkNotificationsRead={handleMarkNotificationsRead}
                 onPreviewDocument={(doc, client) => {
+                  if (client) setCurrentClient(client);
                   if (doc.fileType === 'pdf') setActivePdfDoc(doc);
                   else if (doc.fileType === 'presentation') setActivePresentationDoc(doc);
                   else if (doc.fileType === 'video') setActiveVideoDoc(doc);

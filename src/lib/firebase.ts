@@ -82,8 +82,14 @@ export async function saveDocumentToFirestore(document: DocumentItem): Promise<v
   try {
     // Sanitize document so huge base64 strings don't exceed Firestore 1MB document limit
     const cleanDoc = { ...document };
+    if (cleanDoc.uploadedFileUrl && cleanDoc.uploadedFileUrl.startsWith('blob:')) {
+      cleanDoc.uploadedFileUrl = `indexeddb://${cleanDoc.id}`;
+    }
     if (cleanDoc.uploadedFileUrl && cleanDoc.uploadedFileUrl.startsWith('data:') && cleanDoc.uploadedFileUrl.length > 200000) {
       cleanDoc.uploadedFileUrl = `indexeddb://${cleanDoc.id}`;
+    }
+    if (cleanDoc.rawBase64 && cleanDoc.rawBase64.length > 200000) {
+      delete cleanDoc.rawBase64;
     }
     await setDoc(doc(db, 'documents', document.id), cleanDoc);
   } catch (err) {

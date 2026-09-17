@@ -116,6 +116,34 @@ export async function getFileUrlFromStorage(id: string): Promise<string | null> 
   }
 }
 
+export async function getFileBlobFromStorage(id: string): Promise<Blob | null> {
+  try {
+    const db = await openDatabase();
+    const record = await new Promise<StoredFileRecord | undefined>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get(id);
+
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+
+    if (record && record.data) {
+      return record.data;
+    }
+    return null;
+  } catch (err) {
+    console.warn('[Storage] Failed to retrieve blob from IndexedDB', err);
+    return null;
+  }
+}
+
+export async function getFileArrayBufferFromStorage(id: string): Promise<ArrayBuffer | null> {
+  const blob = await getFileBlobFromStorage(id);
+  if (!blob) return null;
+  return await blob.arrayBuffer();
+}
+
 export async function deleteFileFromStorage(id: string): Promise<void> {
   try {
     if (urlCache.has(id)) {

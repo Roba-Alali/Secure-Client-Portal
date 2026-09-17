@@ -3,7 +3,8 @@ import { DocumentItem, ClientUser, WatermarkConfig, ViewLog, AdminNotification }
 import { WatermarkOverlay } from '../WatermarkOverlay';
 import { MmgLogo } from '../MmgLogo';
 import { MobileScreenshotShield } from '../MobileScreenshotShield';
-import { getFileUrlFromStorage } from '../../utils/fileStorage';
+import { getFileUrlFromStorage, getFileArrayBufferFromStorage } from '../../utils/fileStorage';
+import { PdfCanvasViewer } from './PdfCanvasViewer';
 import {
   X,
   ChevronRight,
@@ -35,29 +36,44 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
 }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [secondsSpent, setSecondsSpent] = useState(0);
+  const [fileArrayBuffer, setFileArrayBuffer] = useState<ArrayBuffer | null>(null);
   const [resolvedFileUrl, setResolvedFileUrl] = useState<string | null>(
-    document.uploadedFileUrl && !document.uploadedFileUrl.startsWith('indexeddb://')
+    document.rawBase64 ||
+    (document.uploadedFileUrl && !document.uploadedFileUrl.startsWith('indexeddb://') && !document.uploadedFileUrl.startsWith('blob:')
       ? document.uploadedFileUrl
-      : null
+      : null)
+  );
+  const hasUploadedFile = !!(
+    document.uploadedFileUrl ||
+    document.rawBase64 ||
+    fileArrayBuffer ||
+    resolvedFileUrl
   );
   const [viewMode, setViewMode] = useState<'original' | 'slides'>(
-    document.uploadedFileUrl ? 'original' : 'slides'
+    hasUploadedFile ? 'original' : 'slides'
   );
 
   useEffect(() => {
     let active = true;
-    if (!resolvedFileUrl || document.uploadedFileUrl?.startsWith('indexeddb://')) {
-      getFileUrlFromStorage(document.id).then((url) => {
-        if (active && url) {
-          setResolvedFileUrl(url);
-          setViewMode('original');
-        }
-      });
-    }
+
+    getFileArrayBufferFromStorage(document.id).then((ab) => {
+      if (active && ab) {
+        setFileArrayBuffer(ab);
+        setViewMode('original');
+      }
+    });
+
+    getFileUrlFromStorage(document.id).then((url) => {
+      if (active && url) {
+        setResolvedFileUrl(url);
+        setViewMode('original');
+      }
+    });
+
     return () => {
       active = false;
     };
-  }, [document.id, resolvedFileUrl]);
+  }, [document.id]);
 
   const slides = document.slides || [
     {
@@ -215,8 +231,8 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
           enabled={watermarkConfig.mobileScreenshotShield !== false}
         >
           <div className="w-full h-full flex items-center justify-center p-4 md:p-10 overflow-auto">
-            {viewMode === 'original' && resolvedFileUrl ? (
-              <div className="relative w-full max-w-5xl h-[82vh] bg-[#121216] rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden flex flex-col items-center justify-center">
+            {viewMode === 'original' && hasUploadedFile ? (
+              <div className="relative w-full max-w-5xl min-h-[82vh] bg-[#121216] rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden flex flex-col items-center justify-center">
                 <WatermarkOverlay
                   config={watermarkConfig}
                   clientEmail={client.email}
@@ -227,26 +243,26 @@ export const PresentationViewerModal: React.FC<PresentationViewerModalProps> = (
 
                 {document.mimeType?.startsWith('image/') ||
                 document.originalFileName?.match(/\.(png|jpe?g|webp|gif|svg)$/i) ||
-                resolvedFileUrl.startsWith('data:image/') ? (
+                (resolvedFileUrl && resolvedFileUrl.startsWith('data:image/')) ? (
                   <div className="p-4 flex items-center justify-center w-full h-full">
                     <img
-                      src={resolvedFileUrl}
+                      src={resolvedFileUrl || document.rawBase64}
                       alt={document.title}
                       className="max-h-[78vh] w-auto max-w-full object-contain rounded-lg shadow-xl select-none"
                     />
                   </div>
                 ) : (
-                  <object
-                    data={`${resolvedFileUrl}#toolbar=0&navpanes=0`}
-                    type="application/pdf"
-                    className="w-full h-full border-0 rounded-2xl"
-                  >
-                    <iframe
-                      src={`${resolvedFileUrl}#toolbar=0&navpanes=0`}
-                      className="w-full h-full border-0 rounded-2xl bg-white"
-                      title={document.title}
+                  <div className="w-full p-4 flex flex-col items-center justify-center min-h-[78vh]">
+                    <PdfCanvasViewer
+                      data={fileArrayBuffer}
+                      url={resolvedFileUrl || document.rawBase64}
+                      currentPage={currentSlide + 1}
+                      zoom={100}
+                      onLoadError={(err) => {
+                        console.warn('Presentation slide render error:', err);
+                      }}
                     />
-                  </object>
+                  </div>
                 )}
               </div>
             ) : (

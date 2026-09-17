@@ -41,6 +41,9 @@ export interface DocumentItem {
   uploadedFileUrl?: string;
   originalFileName?: string;
   mimeType?: string;
+  extractedText?: string;
+  extractedHtml?: string;
+  rawBase64?: string;
 }
 
 export interface Project {

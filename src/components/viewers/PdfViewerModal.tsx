@@ -3,7 +3,8 @@ import { DocumentItem, ClientUser, WatermarkConfig, ViewLog, AdminNotification }
 import { WatermarkOverlay } from '../WatermarkOverlay';
 import { MmgLogo } from '../MmgLogo';
 import { MobileScreenshotShield } from '../MobileScreenshotShield';
-import { getFileUrlFromStorage } from '../../utils/fileStorage';
+import { getFileUrlFromStorage, getFileArrayBufferFromStorage } from '../../utils/fileStorage';
+import { PdfCanvasViewer } from './PdfCanvasViewer';
 import {
   X,
   ChevronRight,
@@ -41,33 +42,53 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
   const [secondsSpent, setSecondsSpent] = useState(0);
   const [maxPageSeen, setMaxPageSeen] = useState(1);
   const [securityToast, setSecurityToast] = useState<string | null>(null);
+  const [fileArrayBuffer, setFileArrayBuffer] = useState<ArrayBuffer | null>(null);
   const [resolvedFileUrl, setResolvedFileUrl] = useState<string | null>(
-    document.uploadedFileUrl && !document.uploadedFileUrl.startsWith('indexeddb://')
+    document.rawBase64 ||
+    (document.uploadedFileUrl && !document.uploadedFileUrl.startsWith('indexeddb://') && !document.uploadedFileUrl.startsWith('blob:')
       ? document.uploadedFileUrl
-      : null
+      : null)
+  );
+  const [totalPages, setTotalPages] = useState<number>(
+    document.pageCount || document.contentPages?.length || 5
+  );
+  const hasUploadedFile = !!(
+    document.uploadedFileUrl ||
+    document.rawBase64 ||
+    document.extractedText ||
+    document.extractedHtml ||
+    fileArrayBuffer ||
+    resolvedFileUrl
   );
   const [viewMode, setViewMode] = useState<'original' | 'summary'>(
-    document.uploadedFileUrl ? 'original' : 'summary'
+    hasUploadedFile ? 'original' : 'summary'
   );
   const containerRef = useRef<HTMLDivElement>(null);
   const hasRecordedInitialView = useRef(false);
 
   useEffect(() => {
     let active = true;
-    if (!resolvedFileUrl || document.uploadedFileUrl?.startsWith('indexeddb://')) {
-      getFileUrlFromStorage(document.id).then((url) => {
-        if (active && url) {
-          setResolvedFileUrl(url);
-          setViewMode('original');
-        }
-      });
-    }
+
+    // 1. Fetch binary ArrayBuffer from IndexedDB
+    getFileArrayBufferFromStorage(document.id).then((ab) => {
+      if (active && ab) {
+        setFileArrayBuffer(ab);
+        setViewMode('original');
+      }
+    });
+
+    // 2. Fetch or refresh Object URL from IndexedDB
+    getFileUrlFromStorage(document.id).then((url) => {
+      if (active && url) {
+        setResolvedFileUrl(url);
+        setViewMode('original');
+      }
+    });
+
     return () => {
       active = false;
     };
-  }, [document.id, resolvedFileUrl]);
-
-  const totalPages = document.pageCount || document.contentPages?.length || 5;
+  }, [document.id]);
 
   // View tracking timer (heartbeat)
   useEffect(() => {
@@ -214,7 +235,7 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
 
         {/* Toolbar Center: Pagination & Zoom */}
         <div className="flex items-center gap-3">
-          {resolvedFileUrl && (
+          {hasUploadedFile && (
             <div className="flex items-center bg-zinc-900/90 p-1 rounded-xl border border-zinc-800 text-xs">
               <button
                 onClick={() => setViewMode('original')}
@@ -319,13 +340,12 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
             ref={containerRef}
             className="w-full h-full overflow-auto p-4 md:p-8 flex justify-center items-start"
           >
-            {viewMode === 'original' && resolvedFileUrl ? (
-              /* REAL UPLOADED FILE VIEW (PDF / IMAGE / DOCUMENT) */
+            {viewMode === 'original' && hasUploadedFile ? (
+              /* REAL UPLOADED FILE VIEW (PDF / IMAGE / WORD / TEXT / DOCUMENT) */
               <div
-                className="relative transition-all duration-200 shadow-2xl rounded-2xl border border-zinc-800 overflow-hidden bg-zinc-950 flex flex-col items-center justify-center"
+                className="relative transition-all duration-200 shadow-2xl rounded-2xl border border-zinc-800 overflow-hidden bg-zinc-950 flex flex-col items-center justify-start min-h-[82vh]"
                 style={{
                   width: `${Math.round(880 * (zoom / 100))}px`,
-                  minHeight: '82vh',
                   maxWidth: '98vw'
                 }}
               >
@@ -338,28 +358,70 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
                   documentTitle={document.title}
                 />
 
+                {/* 1. Image Files */}
                 {document.mimeType?.startsWith('image/') ||
                 document.originalFileName?.match(/\.(png|jpe?g|webp|gif|svg)$/i) ||
-                resolvedFileUrl.startsWith('data:image/') ? (
-                  <div className="p-4 flex items-center justify-center w-full h-full">
+                (resolvedFileUrl && resolvedFileUrl.startsWith('data:image/')) ? (
+                  <div className="p-4 flex items-center justify-center w-full min-h-[75vh]">
                     <img
-                      src={resolvedFileUrl}
+                      src={resolvedFileUrl || document.rawBase64}
                       alt={document.title}
                       className="max-h-[82vh] w-auto max-w-full object-contain rounded-lg shadow-xl select-none"
                     />
                   </div>
+                ) : document.extractedHtml ? (
+                  /* 2. Word (.docx) HTML View */
+                  <div className="w-full p-8 md:p-12 text-zinc-100 bg-zinc-900/90 leading-relaxed font-sans select-none">
+                    <div className="max-w-3xl mx-auto space-y-4">
+                      <div className="pb-4 border-b border-zinc-800 flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#ff4b4f] bg-[#E40107]/15 px-3 py-1 rounded-full border border-[#E40107]/30">
+                          مستند Word معتمد مأخوذ من الملف المرفوع
+                        </span>
+                        <span className="text-xs font-mono text-zinc-400">
+                          {document.originalFileName}
+                        </span>
+                      </div>
+                      <div
+                        className="prose prose-invert max-w-none text-zinc-200 space-y-3 leading-relaxed"
+                        dangerouslySetInnerHTML={{ __html: document.extractedHtml }}
+                      />
+                    </div>
+                  </div>
+                ) : !document.originalFileName?.toLowerCase().endsWith('.pdf') &&
+                  document.extractedText &&
+                  !document.fileType?.includes('pdf') ? (
+                  /* 3. Text / Markdown / Code / Log View */
+                  <div className="w-full p-8 md:p-10 text-zinc-100 bg-zinc-900/95 leading-relaxed font-mono text-xs md:text-sm select-none">
+                    <div className="max-w-4xl mx-auto">
+                      <div className="pb-3 mb-4 border-b border-zinc-800 flex items-center justify-between">
+                        <span className="text-xs font-bold text-emerald-400 bg-emerald-950/40 px-3 py-1 rounded-full border border-emerald-800/40">
+                          نص المستند المرفوع
+                        </span>
+                        <span className="text-xs font-mono text-zinc-400">
+                          {document.originalFileName} ({document.fileSize})
+                        </span>
+                      </div>
+                      <pre className="whitespace-pre-wrap font-mono text-zinc-200 bg-zinc-950 p-6 rounded-xl border border-zinc-800 leading-relaxed">
+                        {document.extractedText}
+                      </pre>
+                    </div>
+                  </div>
                 ) : (
-                  <object
-                    data={`${resolvedFileUrl}#toolbar=0&navpanes=0`}
-                    type="application/pdf"
-                    className="w-full h-[84vh] border-0 rounded-2xl"
-                  >
-                    <iframe
-                      src={`${resolvedFileUrl}#toolbar=0&navpanes=0`}
-                      className="w-full h-[84vh] border-0 rounded-2xl bg-white"
-                      title={document.title}
+                  /* 4. PDF Real Canvas Rendering */
+                  <div className="w-full p-4 flex flex-col items-center justify-center min-h-[80vh]">
+                    <PdfCanvasViewer
+                      data={fileArrayBuffer}
+                      url={resolvedFileUrl || document.rawBase64}
+                      currentPage={currentPage}
+                      zoom={zoom}
+                      onLoadSuccess={(numPages) => {
+                        setTotalPages(numPages);
+                      }}
+                      onLoadError={(err) => {
+                        console.warn('Fallback: PDF render failed:', err);
+                      }}
                     />
-                  </object>
+                  </div>
                 )}
               </div>
             ) : (

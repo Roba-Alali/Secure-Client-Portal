@@ -55,6 +55,8 @@ import {
   cpanelDeploymentSteps
 } from '../../data/cpanelDeploymentCode';
 import { saveFileToStorage } from '../../utils/fileStorage';
+import * as pdfjsLib from 'pdfjs-dist';
+import mammoth from 'mammoth';
 
 interface AdminDashboardProps {
   clients: ClientUser[];
@@ -542,6 +544,85 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
     }
 
+    // Extract real document contents, pages, and text dynamically
+    let extractedText: string | undefined = undefined;
+    let extractedHtml: string | undefined = undefined;
+    let calculatedPages: string[] | undefined = undefined;
+    let dynamicPageCount = newDocForm.pageCount;
+    let base64String: string | undefined = undefined;
+
+    if (selectedFile) {
+      const fileNameLower = selectedFile.name.toLowerCase();
+
+      // Read small files as Data URL for instant resilient preview
+      if (selectedFile.size < 3 * 1024 * 1024) {
+        try {
+          base64String = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve((reader.result as string) || '');
+            reader.onerror = () => resolve('');
+            reader.readAsDataURL(selectedFile);
+          });
+        } catch {
+          // ignore
+        }
+      }
+
+      // 1. PDF real text & page extraction
+      if (fileNameLower.endsWith('.pdf') || selectedFile.type.includes('pdf')) {
+        try {
+          const ab = await selectedFile.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(ab) }).promise;
+          dynamicPageCount = pdf.numPages;
+          const pages: string[] = [];
+          for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
+            const page = await pdf.getPage(i);
+            const tc = await page.getTextContent();
+            const str = tc.items.map((it: any) => it.str || '').filter(Boolean).join(' ');
+            pages.push(str.trim() || `صفحة ${i}: مستند رسمي معتمد`);
+          }
+          if (pages.length > 0) {
+            calculatedPages = pages;
+            extractedText = pages.join('\n\n');
+          }
+        } catch (pdfErr) {
+          console.warn('PDF parsing error during upload:', pdfErr);
+        }
+      }
+      // 2. Word DOCX real HTML & text extraction
+      else if (fileNameLower.endsWith('.docx') || selectedFile.type.includes('wordprocessingml')) {
+        try {
+          const ab = await selectedFile.arrayBuffer();
+          const resHtml = await mammoth.convertToHtml({ arrayBuffer: ab });
+          extractedHtml = resHtml.value;
+          const resRaw = await mammoth.extractRawText({ arrayBuffer: ab });
+          extractedText = resRaw.value;
+          if (extractedText) {
+            const paras = extractedText.split('\n\n').map((p) => p.trim()).filter(Boolean);
+            calculatedPages = paras.length > 0 ? paras : [extractedText];
+            dynamicPageCount = Math.max(1, Math.ceil(paras.length / 3));
+          }
+        } catch (docxErr) {
+          console.warn('Docx parsing error during upload:', docxErr);
+        }
+      }
+      // 3. Text / Markdown / CSV / JSON
+      else if (
+        selectedFile.type.startsWith('text/') ||
+        fileNameLower.match(/\.(txt|md|csv|json|html|xml|log|rtf|yaml|yml)$/i)
+      ) {
+        try {
+          const text = await selectedFile.text();
+          extractedText = text;
+          const paras = text.split('\n\n').map((p) => p.trim()).filter(Boolean);
+          calculatedPages = paras.length > 0 ? paras : [text];
+          dynamicPageCount = Math.max(1, Math.ceil(paras.length / 3));
+        } catch (txtErr) {
+          console.warn('Text file read error during upload:', txtErr);
+        }
+      }
+    }
+
     // Build specialized slides or content pages for preview
     const cleanTitle = newDocForm.title.trim();
     const cleanDesc = newDocForm.description.trim() || 'مستند استراتيجي محمي وخاص ببوابة MMG VIP.';
@@ -555,7 +636,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       descriptionEn: cleanDesc,
       fileType: newDocForm.fileType,
       fileSize: fileSizeFormatted,
-      pageCount: newDocForm.fileType === 'video' ? undefined : (newDocForm.pageCount || (newDocForm.fileType === 'presentation' ? 6 : 5)),
+      pageCount: newDocForm.fileType === 'video' ? undefined : (dynamicPageCount || (newDocForm.pageCount || (newDocForm.fileType === 'presentation' ? 6 : 5))),
       duration: newDocForm.fileType === 'video' ? (newDocForm.duration || '03:15') : undefined,
       uploadedAt: new Date().toISOString().split('T')[0],
       isConfidential: true,
@@ -565,7 +646,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       uploadedFileUrl: finalFileUrl,
       originalFileName: selectedFile?.name || `${cleanTitle}.${newDocForm.fileType === 'pdf' ? 'pdf' : newDocForm.fileType === 'video' ? 'mp4' : 'pptx'}`,
       mimeType: selectedFile?.type,
-      contentPages: [
+      extractedText,
+      extractedHtml,
+      rawBase64: base64String,
+      contentPages: calculatedPages || [
         `صفحة 1: ملف معتمد مرفوع حديثاً: ${cleanTitle}`,
         `صفحة 2: بيانات المشروع والتحليلات السرية - ${cleanDesc}`,
         `صفحة 3: دراسة التكاليف والجدول الزمني لتنفيذ المبادرة الإعلامية.`,
