@@ -3,6 +3,7 @@ import { DocumentItem, ClientUser, WatermarkConfig, ViewLog, AdminNotification }
 import { WatermarkOverlay } from '../WatermarkOverlay';
 import { MmgLogo } from '../MmgLogo';
 import { MobileScreenshotShield } from '../MobileScreenshotShield';
+import { getFileUrlFromStorage } from '../../utils/fileStorage';
 import {
   X,
   Play,
@@ -37,9 +38,28 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
   const [totalDuration, setTotalDuration] = useState(90);
   const [isMuted, setIsMuted] = useState(false);
   const [secondsSpent, setSecondsSpent] = useState(0);
+  const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string | null>(
+    document.uploadedFileUrl && !document.uploadedFileUrl.startsWith('indexeddb://')
+      ? document.uploadedFileUrl
+      : null
+  );
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const hasRecordedInitialView = useRef(false);
+
+  useEffect(() => {
+    let active = true;
+    if (!resolvedVideoUrl || document.uploadedFileUrl?.startsWith('indexeddb://')) {
+      getFileUrlFromStorage(document.id).then((url) => {
+        if (active && url) {
+          setResolvedVideoUrl(url);
+        }
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [document.id, resolvedVideoUrl]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -199,7 +219,7 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
 
           <video
             ref={videoRef}
-            src={document.uploadedFileUrl || document.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'}
+            src={resolvedVideoUrl || document.uploadedFileUrl || document.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'}
             className="w-full h-full object-contain"
             onTimeUpdate={handleTimeUpdate}
             onEnded={() => setIsPlaying(false)}

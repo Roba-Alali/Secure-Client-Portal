@@ -152,10 +152,10 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
   useEffect(() => {
     if (!enabled) return;
 
-    // 1. Visibility Change: Trigger blackout when app/tab is hidden; auto-restore when user returns
+    // 1. Visibility Change: Trigger blackout only when tab/window is truly hidden in background; auto-restore immediately when user returns
     const handleVisibilityChange = () => {
       if (document.hidden || document.visibilityState === 'hidden') {
-        executeSynchronousBlackout('سحب قائمة الإشعارات أو مغادرة التطبيق', 'visibility_hidden');
+        executeSynchronousBlackout('مغادرة التطبيق أو إخفاء النافذة', 'visibility_hidden');
       } else if (document.visibilityState === 'visible') {
         // Automatically restore content immediately upon returning
         handleManualRestore();
@@ -172,31 +172,7 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
       executeSynchronousBlackout('تجميد حالة الصفحة من نظام التشغيل', 'page_freeze');
     };
 
-    // 2. Hardware Screenshot Keys & Buttons:
-    // When Power+Volume buttons are pressed simultaneously on mobile, OS cancels active touches
-    const handleTouchCancel = () => {
-      if (Date.now() < blackoutCooldownRef.current) return;
-      if (isTouchingRef.current) {
-        isTouchingRef.current = false;
-        executeSynchronousBlackout('حظر لقطة شاشة الهاتف عبر مقاطعة اللمس بأزرار الجهاز', 'touch_cancel');
-        triggerToast('🚨 تم حظر لقطة الشاشة: استشعار مقاطعة لمس الشاشة بأزرار الهاتف.');
-      }
-    };
-
-    // 3. Android Dropdown Notification Shade Detection via Window Resize:
-    const handleResize = () => {
-      if (Date.now() < blackoutCooldownRef.current) return;
-      const currentHeight = window.innerHeight;
-      const heightDelta = Math.abs(currentHeight - lastHeightRef.current);
-      lastHeightRef.current = currentHeight;
-
-      // When the full Android notification shade or quick settings menu drops down significantly (> 200px)
-      if (heightDelta > 200 && !isTouchingRef.current && (document.hidden || document.visibilityState === 'hidden')) {
-        executeSynchronousBlackout('رصد سحب القائمة المنسدلة / شريط النظام', 'notification_shade_pulldown');
-      }
-    };
-
-    // 4. Print Screen & Desktop Screenshot System Shortcuts
+    // 2. Print Screen & Desktop Screenshot System Shortcuts (Real screenshot shortcuts only)
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'PrintScreen' || e.code === 'PrintScreen' || e.keyCode === 44) {
         e.preventDefault();
@@ -233,7 +209,7 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
       }
     };
 
-    // 5. BeforePrint event (browser print to PDF / save screenshot)
+    // 3. BeforePrint event (browser print to PDF / save screenshot)
     const handleBeforePrint = () => {
       executeSynchronousBlackout('حظر طباعة أو حفظ المستند كصورة', 'before_print');
     };
@@ -241,9 +217,6 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('pagehide', handlePageHide);
     document.addEventListener('freeze', handleFreeze);
-    window.addEventListener('touchcancel', handleTouchCancel, { passive: true });
-    window.addEventListener('pointercancel', handleTouchCancel, { passive: true });
-    window.addEventListener('resize', handleResize);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('beforeprint', handleBeforePrint);
@@ -252,9 +225,6 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('pagehide', handlePageHide);
       document.removeEventListener('freeze', handleFreeze);
-      window.removeEventListener('touchcancel', handleTouchCancel);
-      window.removeEventListener('pointercancel', handleTouchCancel);
-      window.removeEventListener('resize', handleResize);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('beforeprint', handleBeforePrint);
@@ -586,8 +556,19 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
             onTouchEnd={(e) => handleManualRestore(e)}
             className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#E40107] to-[#b80005] hover:from-[#ff1a20] hover:to-[#E40107] text-white text-xs sm:text-sm font-bold shadow-lg shadow-red-950/60 flex items-center gap-2 transition-all active:scale-95 cursor-pointer z-50 border border-red-500/40"
           >
-            <span>العودة ومتابعة تصفح المستند الآن</span>
+            <span>متابعة عرض وقراءة المستند الآن</span>
             <Shield className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              handleManualRestore();
+              blackoutCooldownRef.current = Date.now() + 600000; // Pause blackout for 10 minutes
+              triggerToast('تم تعطيل درع الحظر مؤقتاً لتصفح المستند بسلاسة');
+            }}
+            className="text-[11px] text-zinc-400 hover:text-white underline cursor-pointer transition-colors py-1"
+          >
+            إيقاف درع الحجب مؤقتاً (عرض كامل بدون مقاطعة)
           </button>
           <span className="text-[10px] text-zinc-500">
             تُستأنف الرؤية تلقائياً أيضاً بمجرد زوال محاولة التصوير

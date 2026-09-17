@@ -25,6 +25,16 @@ import {
   getStoredNotifications,
   saveStoredNotifications
 } from './utils/storage';
+import {
+  saveDocumentToFirestore,
+  deleteDocumentFromFirestore,
+  listenToFirestoreDocuments,
+  saveAuditLogToFirestore,
+  listenToFirestoreAuditLogs,
+  saveWatermarkConfigToFirestore,
+  listenToFirestoreWatermark,
+  testConnection
+} from './lib/firebase';
 import { Navbar } from './components/Navbar';
 import { ClientLogin } from './components/client/ClientLogin';
 import { ClientPortal } from './components/client/ClientPortal';
@@ -98,6 +108,57 @@ export default function App() {
     saveStoredNotifications(notifications);
   }, [notifications]);
 
+  // Real-time Firestore Cloud Synchronization
+  useEffect(() => {
+    testConnection().catch(() => {});
+
+    // Listen to remote documents
+    const unsubDocs = listenToFirestoreDocuments((remoteDocs) => {
+      if (remoteDocs && remoteDocs.length > 0) {
+        setDocuments((prevDocs) => {
+          const merged = [...remoteDocs];
+          for (const localDoc of prevDocs) {
+            if (!merged.some((d) => d.id === localDoc.id)) {
+              merged.push(localDoc);
+            }
+          }
+          return merged;
+        });
+      }
+    });
+
+    // Listen to remote audit logs
+    const unsubLogs = listenToFirestoreAuditLogs((remoteLogs) => {
+      if (remoteLogs && remoteLogs.length > 0) {
+        setViewLogs((prevLogs) => {
+          const merged = [...remoteLogs];
+          for (const localLog of prevLogs) {
+            if (!merged.some((l) => l.id === localLog.id)) {
+              merged.push(localLog);
+            }
+          }
+          return merged;
+        });
+      }
+    });
+
+    // Listen to remote watermark settings
+    const unsubWatermark = listenToFirestoreWatermark((remoteConfig) => {
+      if (remoteConfig && remoteConfig.template) {
+        setWatermarkConfig((prev) => ({
+          ...prev,
+          ...remoteConfig
+        }));
+      }
+    });
+
+    return () => {
+      unsubDocs();
+      unsubLogs();
+      unsubWatermark();
+    };
+  }, []);
+
   // Handlers
   const handleClientLoginSuccess = (client: ClientUser) => {
     localStorage.setItem('mmg_session_auth', 'true');
@@ -140,6 +201,11 @@ export default function App() {
       if (prev.some((v) => v.id === log.id)) return prev;
       return [log, ...prev];
     });
+    // Persist audit log to Firestore
+    saveAuditLogToFirestore(log).catch((err) => {
+      console.warn('[Firestore] Audit log save error:', err);
+    });
+
     if (notif) {
       setNotifications((prev) => {
         if (prev.some((n) => n.id === notif.id)) return prev;
@@ -148,14 +214,22 @@ export default function App() {
     }
     // Increment document view count
     setDocuments((prevDocs) =>
-      prevDocs.map((doc) =>
-        doc.id === log.documentId ? { ...doc, viewsCount: doc.viewsCount + 1 } : doc
-      )
+      prevDocs.map((doc) => {
+        if (doc.id === log.documentId) {
+          const updated = { ...doc, viewsCount: doc.viewsCount + 1 };
+          saveDocumentToFirestore(updated).catch(() => {});
+          return updated;
+        }
+        return doc;
+      })
     );
   };
 
   const handleUpdateWatermark = (newConfig: WatermarkConfig) => {
     setWatermarkConfig(newConfig);
+    saveWatermarkConfigToFirestore(newConfig).catch((err) => {
+      console.warn('[Firestore] Watermark config save error:', err);
+    });
   };
 
   const handleAddClient = (newClient: ClientUser) => {
@@ -181,10 +255,16 @@ export default function App() {
 
   const handleAddDocument = (newDoc: DocumentItem) => {
     setDocuments((prev) => [newDoc, ...prev]);
+    saveDocumentToFirestore(newDoc).catch((err) => {
+      console.warn('[Firestore] Document save error:', err);
+    });
   };
 
   const handleDeleteDocument = (id: string) => {
     setDocuments((prev) => prev.filter((d) => d.id !== id));
+    deleteDocumentFromFirestore(id).catch((err) => {
+      console.warn('[Firestore] Document delete error:', err);
+    });
   };
 
   const handleMarkNotificationsRead = () => {

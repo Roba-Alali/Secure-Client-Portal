@@ -1,0 +1,93 @@
+{
+  "entities": {
+    "Document": {
+      "title": "Document",
+      "description": "Secure enterprise document protected by MMG VIP DRM",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "fileType": { "type": "string" },
+        "originalFileName": { "type": "string" },
+        "fileSize": { "type": "string" },
+        "uploadedAt": { "type": "string" },
+        "watermarkEnabled": { "type": "boolean" },
+        "downloadRestricted": { "type": "boolean" },
+        "viewsCount": { "type": "number" },
+        "uploadedFileUrl": { "type": "string" },
+        "mimeType": { "type": "string" }
+      },
+      "required": ["id", "title", "fileType"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Realtime security and access audit log entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "documentId": { "type": "string" },
+        "documentTitle": { "type": "string" },
+        "clientEmail": { "type": "string" },
+        "clientName": { "type": "string" },
+        "clientCompany": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "ipAddress": { "type": "string" },
+        "userAgent": { "type": "string" }
+      },
+      "required": ["id", "documentId", "action", "timestamp"]
+    },
+    "Client": {
+      "title": "Client",
+      "description": "Authorized VIP client account",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "company": { "type": "string" },
+        "role": { "type": "string" },
+        "ipAddress": { "type": "string" },
+        "accessPin": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "accessPin"]
+    },
+    "WatermarkSettings": {
+      "title": "WatermarkSettings",
+      "description": "Dynamic watermark configuration",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "opacity": { "type": "number" },
+        "fontSize": { "type": "number" },
+        "showTimestamp": { "type": "boolean" },
+        "showClientEmail": { "type": "boolean" },
+        "showClientIp": { "type": "boolean" },
+        "diagonalAngle": { "type": "number" },
+        "color": { "type": "string" },
+        "mobileScreenshotShield": { "type": "boolean" }
+      },
+      "required": ["text"]
+    }
+  },
+  "firestore": {
+    "/documents/{documentId}": {
+      "schema": "Document",
+      "description": "Collection of secure documents"
+    },
+    "/auditLogs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Collection of real-time audit trail and screenshot attempts"
+    },
+    "/clients/{clientId}": {
+      "schema": "Client",
+      "description": "Collection of authorized clients"
+    },
+    "/settings/watermark": {
+      "schema": "WatermarkSettings",
+      "description": "Global watermark security settings"
+    }
+  }
+}

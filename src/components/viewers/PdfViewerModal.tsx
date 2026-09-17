@@ -3,6 +3,7 @@ import { DocumentItem, ClientUser, WatermarkConfig, ViewLog, AdminNotification }
 import { WatermarkOverlay } from '../WatermarkOverlay';
 import { MmgLogo } from '../MmgLogo';
 import { MobileScreenshotShield } from '../MobileScreenshotShield';
+import { getFileUrlFromStorage } from '../../utils/fileStorage';
 import {
   X,
   ChevronRight,
@@ -15,7 +16,9 @@ import {
   Eye,
   Clock,
   FileText,
-  AlertTriangle
+  AlertTriangle,
+  FileUp,
+  LayoutTemplate
 } from 'lucide-react';
 
 interface PdfViewerModalProps {
@@ -38,8 +41,31 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
   const [secondsSpent, setSecondsSpent] = useState(0);
   const [maxPageSeen, setMaxPageSeen] = useState(1);
   const [securityToast, setSecurityToast] = useState<string | null>(null);
+  const [resolvedFileUrl, setResolvedFileUrl] = useState<string | null>(
+    document.uploadedFileUrl && !document.uploadedFileUrl.startsWith('indexeddb://')
+      ? document.uploadedFileUrl
+      : null
+  );
+  const [viewMode, setViewMode] = useState<'original' | 'summary'>(
+    document.uploadedFileUrl ? 'original' : 'summary'
+  );
   const containerRef = useRef<HTMLDivElement>(null);
   const hasRecordedInitialView = useRef(false);
+
+  useEffect(() => {
+    let active = true;
+    if (!resolvedFileUrl || document.uploadedFileUrl?.startsWith('indexeddb://')) {
+      getFileUrlFromStorage(document.id).then((url) => {
+        if (active && url) {
+          setResolvedFileUrl(url);
+          setViewMode('original');
+        }
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [document.id, resolvedFileUrl]);
 
   const totalPages = document.pageCount || document.contentPages?.length || 5;
 
@@ -187,46 +213,77 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
         </div>
 
         {/* Toolbar Center: Pagination & Zoom */}
-        <div className="hidden sm:flex items-center gap-2 bg-zinc-900/90 px-3 py-1.5 rounded-xl border border-zinc-800">
-          <button
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage <= 1}
-            className="p-1 rounded hover:bg-zinc-800 disabled:opacity-40 transition-colors"
-            title="الصفحة السابقة"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-          <span className="text-xs font-mono font-medium px-2 text-zinc-200">
-            {currentPage} / {totalPages}
-          </span>
-          <button
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage >= totalPages}
-            className="p-1 rounded hover:bg-zinc-800 disabled:opacity-40 transition-colors"
-            title="الصفحة التالية"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
+        <div className="flex items-center gap-3">
+          {resolvedFileUrl && (
+            <div className="flex items-center bg-zinc-900/90 p-1 rounded-xl border border-zinc-800 text-xs">
+              <button
+                onClick={() => setViewMode('original')}
+                className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all ${
+                  viewMode === 'original'
+                    ? 'bg-[#E40107] text-white shadow'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+                title="عرض المستند الحقيقي المرفوع"
+              >
+                <FileUp className="w-3.5 h-3.5" />
+                <span>المستند المرفوع</span>
+              </button>
+              <button
+                onClick={() => setViewMode('summary')}
+                className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all ${
+                  viewMode === 'summary'
+                    ? 'bg-[#E40107] text-white shadow'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+                title="عرض الملخص الرسمي والاعتمادات"
+              >
+                <LayoutTemplate className="w-3.5 h-3.5" />
+                <span>الملخص الرسمي</span>
+              </button>
+            </div>
+          )}
 
-          <div className="w-px h-4 bg-zinc-800 mx-1" />
+          <div className="hidden sm:flex items-center gap-2 bg-zinc-900/90 px-3 py-1.5 rounded-xl border border-zinc-800">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage <= 1}
+              className="p-1 rounded hover:bg-zinc-800 disabled:opacity-40 transition-colors"
+              title="الصفحة السابقة"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <span className="text-xs font-mono font-medium px-2 text-zinc-200">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage >= totalPages}
+              className="p-1 rounded hover:bg-zinc-800 disabled:opacity-40 transition-colors"
+              title="الصفحة التالية"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
 
-          <button
-            onClick={() => setZoom((z) => Math.max(70, z - 10))}
-            className="p-1 rounded hover:bg-zinc-800 transition-colors"
-            title="تصغير"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
-          <span className="text-xs font-mono text-zinc-300 min-w-[36px] text-center">
-            {zoom}%
-          </span>
-          <button
-            onClick={() => setZoom((z) => Math.min(150, z + 10))}
-            className="p-1 rounded hover:bg-zinc-800 transition-colors"
-            title="تكبير"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
+            <div className="w-px h-4 bg-zinc-800 mx-1" />
+
+            <button
+              onClick={() => setZoom((z) => Math.max(70, z - 10))}
+              className="p-1 rounded hover:bg-zinc-800 transition-colors"
+              title="تصغير"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <span className="text-xs font-mono text-zinc-300 min-w-[36px] text-center">
+              {zoom}%
+            </span>
+            <button
+              onClick={() => setZoom((z) => Math.min(150, z + 10))}
+              className="p-1 rounded hover:bg-zinc-800 transition-colors"
+              title="تكبير"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Right Info & Close */}
@@ -262,118 +319,164 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
             ref={containerRef}
             className="w-full h-full overflow-auto p-4 md:p-8 flex justify-center items-start"
           >
-        <div
-          className="relative transition-all duration-200 shadow-2xl rounded-sm border border-slate-700/60 overflow-hidden"
-          style={{
-            width: `${Math.round(750 * (zoom / 100))}px`,
-            minHeight: `${Math.round(1000 * (zoom / 100))}px`,
-            backgroundColor: '#ffffff'
-          }}
-        >
-          {/* DYNAMIC WATERMARK LAYER */}
-          <WatermarkOverlay
-            config={watermarkConfig}
-            clientEmail={client.email}
-            clientName={client.name}
-            clientIp={client.ipAddress || '197.34.12.88'}
-            documentTitle={document.title}
-          />
+            {viewMode === 'original' && resolvedFileUrl ? (
+              /* REAL UPLOADED FILE VIEW (PDF / IMAGE / DOCUMENT) */
+              <div
+                className="relative transition-all duration-200 shadow-2xl rounded-2xl border border-zinc-800 overflow-hidden bg-zinc-950 flex flex-col items-center justify-center"
+                style={{
+                  width: `${Math.round(880 * (zoom / 100))}px`,
+                  minHeight: '82vh',
+                  maxWidth: '98vw'
+                }}
+              >
+                {/* Dynamic Watermark Overlay directly superimposed over the real file */}
+                <WatermarkOverlay
+                  config={watermarkConfig}
+                  clientEmail={client.email}
+                  clientName={client.name}
+                  clientIp={client.ipAddress || '197.34.12.88'}
+                  documentTitle={document.title}
+                />
 
-          {/* SIMULATED PDF RENDER CANVAS */}
-          <div className="p-10 md:p-14 text-zinc-900 flex flex-col justify-between h-full min-h-[960px] font-sans">
-            {/* Header Document Banner */}
-            <div>
-              <div className="flex items-center justify-between border-b-2 border-zinc-900/20 pb-4 mb-8">
-                <div className="flex items-center gap-3">
-                  <MmgLogo size="sm" variant="icon" />
-                  <div>
-                    <h3 className="text-xs font-black text-zinc-900 tracking-wider">MMG VIP ENTERPRISE DOCS</h3>
-                    <p className="text-[10px] text-zinc-500 font-mono">REF: #{document.id.toUpperCase()}-2026 • MODERN MEDIA GLOBAL</p>
+                {document.mimeType?.startsWith('image/') ||
+                document.originalFileName?.match(/\.(png|jpe?g|webp|gif|svg)$/i) ||
+                resolvedFileUrl.startsWith('data:image/') ? (
+                  <div className="p-4 flex items-center justify-center w-full h-full">
+                    <img
+                      src={resolvedFileUrl}
+                      alt={document.title}
+                      className="max-h-[82vh] w-auto max-w-full object-contain rounded-lg shadow-xl select-none"
+                    />
                   </div>
-                </div>
-
-                <div className="text-left font-mono text-[10px] text-zinc-500">
-                  <span className="inline-block px-2 py-0.5 rounded bg-red-100 text-[#c90005] font-bold mb-1 border border-red-200">
-                    MMG RESTRICTED & CONFIDENTIAL
-                  </span>
-                  <div>DATE: {document.uploadedAt}</div>
-                  {document.originalFileName && (
-                    <div className="text-emerald-700 font-semibold mt-0.5">
-                      SRC: {document.originalFileName} ({document.fileSize})
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Title Section */}
-              <div className="mb-6">
-                <span className="text-xs font-semibold text-[#c90005] bg-red-50 px-2.5 py-0.5 rounded-full border border-red-200">
-                  وثيقة رسمية معتمدة • مخصصة لـ: {client.company}
-                </span>
-                <h1 className="text-xl md:text-2xl font-black text-zinc-900 mt-2 mb-2 leading-relaxed">
-                  {document.title}
-                </h1>
-                <p className="text-xs text-zinc-600 leading-relaxed border-r-2 border-[#E40107] pr-3">
-                  {document.description}
-                </p>
-              </div>
-
-              {/* Body Text Mock */}
-              <div className="space-y-4 text-xs md:text-sm text-zinc-700 leading-relaxed text-justify">
-                <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-200">
-                  <h4 className="font-bold text-zinc-900 mb-2 flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-[#E40107]" />
-                    محتوى الصفحة ({currentPage} من {totalPages}):
-                  </h4>
-                  <p className="text-zinc-800 font-medium leading-relaxed">
-                    {currentContentText}
-                  </p>
-                </div>
-
-                <p className="leading-relaxed">
-                  يقر المستلم والمطلع على هذه الوثيقة بأن كافة المعلومات الواردة بها محمية بموجب أنظمة حماية البيانات وحقوق الملكية الفكرية لشركة Modern Media Global، ولا يجوز نسخها أو تصوير الشاشة أو تداولها أو إعادة بثها بأي شكل من الأشكال تحت طائلة المسؤولية القانونية المدنية والجنائية.
-                </p>
-
-                <div className="grid grid-cols-2 gap-4 my-6">
-                  <div className="p-3 bg-zinc-100/80 rounded-xl border border-zinc-200">
-                    <div className="text-[10px] text-zinc-500 uppercase font-mono">Recipient Entity</div>
-                    <div className="text-xs font-bold text-zinc-900 mt-0.5">{client.company}</div>
-                    <div className="text-[11px] text-zinc-600">{client.name}</div>
-                  </div>
-                  <div className="p-3 bg-zinc-100/80 rounded-xl border border-zinc-200">
-                    <div className="text-[10px] text-zinc-500 uppercase font-mono">Access Security Level</div>
-                    <div className="text-xs font-bold text-[#c90005] mt-0.5">Level 3 - MMG Dynamic Watermarked</div>
-                    <div className="text-[11px] text-zinc-600">DRM: Protected Document</div>
-                  </div>
-                </div>
-
-                {currentPage === totalPages && (
-                  <div className="mt-8 pt-6 border-t-2 border-zinc-200 flex justify-between items-end">
-                    <div>
-                      <div className="text-[10px] text-zinc-500 uppercase font-bold">MMG Authorized Seal</div>
-                      <div className="w-36 h-14 border-2 border-dashed border-[#E40107] bg-red-50/70 rounded-xl flex items-center justify-center text-[#c90005] text-xs font-bold rotate-[-2deg] mt-1 shadow-sm">
-                        ✓ Modern Media Global
-                      </div>
-                    </div>
-                    <div className="text-left font-mono text-[10px] text-zinc-500">
-                      <div>AUDIT HASH: MMG-SHA256-8F29A03E</div>
-                      <div>PORTAL HOST: MMG VIP Secure Host (mmglobal.vip)</div>
-                    </div>
-                  </div>
+                ) : (
+                  <object
+                    data={`${resolvedFileUrl}#toolbar=0&navpanes=0`}
+                    type="application/pdf"
+                    className="w-full h-[84vh] border-0 rounded-2xl"
+                  >
+                    <iframe
+                      src={`${resolvedFileUrl}#toolbar=0&navpanes=0`}
+                      className="w-full h-[84vh] border-0 rounded-2xl bg-white"
+                      title={document.title}
+                    />
+                  </object>
                 )}
               </div>
-            </div>
+            ) : (
+              /* SIMULATED PDF RENDER CANVAS & SUMMARY */
+              <div
+                className="relative transition-all duration-200 shadow-2xl rounded-sm border border-slate-700/60 overflow-hidden"
+                style={{
+                  width: `${Math.round(750 * (zoom / 100))}px`,
+                  minHeight: `${Math.round(1000 * (zoom / 100))}px`,
+                  backgroundColor: '#ffffff'
+                }}
+              >
+                {/* DYNAMIC WATERMARK LAYER */}
+                <WatermarkOverlay
+                  config={watermarkConfig}
+                  clientEmail={client.email}
+                  clientName={client.name}
+                  clientIp={client.ipAddress || '197.34.12.88'}
+                  documentTitle={document.title}
+                />
 
-            {/* Document Footer */}
-              <div className="pt-6 border-t border-zinc-200 flex justify-between items-center text-[10px] text-zinc-500 font-mono">
-                <div>CONFIDENTIAL • FOR AUTHORIZED EYES ONLY • MMGLOBAL.VIP</div>
-                <div>PAGE {currentPage} OF {totalPages}</div>
+                {/* SIMULATED PDF RENDER CANVAS */}
+                <div className="p-10 md:p-14 text-zinc-900 flex flex-col justify-between h-full min-h-[960px] font-sans">
+                  {/* Header Document Banner */}
+                  <div>
+                    <div className="flex items-center justify-between border-b-2 border-zinc-900/20 pb-4 mb-8">
+                      <div className="flex items-center gap-3">
+                        <MmgLogo size="sm" variant="icon" />
+                        <div>
+                          <h3 className="text-xs font-black text-zinc-900 tracking-wider">MMG VIP ENTERPRISE DOCS</h3>
+                          <p className="text-[10px] text-zinc-500 font-mono">REF: #{document.id.toUpperCase()}-2026 • MODERN MEDIA GLOBAL</p>
+                        </div>
+                      </div>
+
+                      <div className="text-left font-mono text-[10px] text-zinc-500">
+                        <span className="inline-block px-2 py-0.5 rounded bg-red-100 text-[#c90005] font-bold mb-1 border border-red-200">
+                          MMG RESTRICTED & CONFIDENTIAL
+                        </span>
+                        <div>DATE: {document.uploadedAt}</div>
+                        {document.originalFileName && (
+                          <div className="text-emerald-700 font-semibold mt-0.5">
+                            SRC: {document.originalFileName} ({document.fileSize})
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Title Section */}
+                    <div className="mb-6">
+                      <span className="text-xs font-semibold text-[#c90005] bg-red-50 px-2.5 py-0.5 rounded-full border border-red-200">
+                        وثيقة رسمية معتمدة • مخصصة لـ: {client.company}
+                      </span>
+                      <h1 className="text-xl md:text-2xl font-black text-zinc-900 mt-2 mb-2 leading-relaxed">
+                        {document.title}
+                      </h1>
+                      <p className="text-xs text-zinc-600 leading-relaxed border-r-2 border-[#E40107] pr-3">
+                        {document.description}
+                      </p>
+                    </div>
+
+                    {/* Body Text Mock */}
+                    <div className="space-y-4 text-xs md:text-sm text-zinc-700 leading-relaxed text-justify">
+                      <div className="p-4 bg-zinc-50 rounded-xl border border-zinc-200">
+                        <h4 className="font-bold text-zinc-900 mb-2 flex items-center gap-2">
+                          <ShieldCheck className="w-4 h-4 text-[#E40107]" />
+                          محتوى الصفحة ({currentPage} من {totalPages}):
+                        </h4>
+                        <p className="text-zinc-800 font-medium leading-relaxed">
+                          {currentContentText}
+                        </p>
+                      </div>
+
+                      <p className="leading-relaxed">
+                        يقر المستلم والمطلع على هذه الوثيقة بأن كافة المعلومات الواردة بها محمية بموجب أنظمة حماية البيانات وحقوق الملكية الفكرية لشركة Modern Media Global، ولا يجوز نسخها أو تصوير الشاشة أو تداولها أو إعادة بثها بأي شكل من الأشكال تحت طائلة المسؤولية القانونية المدنية والجنائية.
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-4 my-6">
+                        <div className="p-3 bg-zinc-100/80 rounded-xl border border-zinc-200">
+                          <div className="text-[10px] text-zinc-500 uppercase font-mono">Recipient Entity</div>
+                          <div className="text-xs font-bold text-zinc-900 mt-0.5">{client.company}</div>
+                          <div className="text-[11px] text-zinc-600">{client.name}</div>
+                        </div>
+                        <div className="p-3 bg-zinc-100/80 rounded-xl border border-zinc-200">
+                          <div className="text-[10px] text-zinc-500 uppercase font-mono">Access Security Level</div>
+                          <div className="text-xs font-bold text-[#c90005] mt-0.5">Level 3 - MMG Dynamic Watermarked</div>
+                          <div className="text-[11px] text-zinc-600">DRM: Protected Document</div>
+                        </div>
+                      </div>
+
+                      {currentPage === totalPages && (
+                        <div className="mt-8 pt-6 border-t-2 border-zinc-200 flex justify-between items-end">
+                          <div>
+                            <div className="text-[10px] text-zinc-500 uppercase font-bold">MMG Authorized Seal</div>
+                            <div className="w-36 h-14 border-2 border-dashed border-[#E40107] bg-red-50/70 rounded-xl flex items-center justify-center text-[#c90005] text-xs font-bold rotate-[-2deg] mt-1 shadow-sm">
+                              ✓ Modern Media Global
+                            </div>
+                          </div>
+                          <div className="text-left font-mono text-[10px] text-zinc-500">
+                            <div>AUDIT HASH: MMG-SHA256-8F29A03E</div>
+                            <div>PORTAL HOST: MMG VIP Secure Host (mmglobal.vip)</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Document Footer */}
+                  <div className="pt-6 border-t border-zinc-200 flex justify-between items-center text-[10px] text-zinc-500 font-mono">
+                    <div>CONFIDENTIAL • FOR AUTHORIZED EYES ONLY • MMGLOBAL.VIP</div>
+                    <div>PAGE {currentPage} OF {totalPages}</div>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
-        </div>
-      </MobileScreenshotShield>
-    </div>
+        </MobileScreenshotShield>
+      </div>
 
       {/* Bottom Bar: Mobile Pagination & Security Reminder */}
       <div className="h-12 bg-[#0c0c0e] border-t border-zinc-800 px-4 flex items-center justify-between text-xs text-zinc-400">

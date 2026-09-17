@@ -54,6 +54,7 @@ import {
   cpanelHtaccess,
   cpanelDeploymentSteps
 } from '../../data/cpanelDeploymentCode';
+import { saveFileToStorage } from '../../utils/fileStorage';
 
 interface AdminDashboardProps {
   clients: ClientUser[];
@@ -338,6 +339,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const docId = `doc-${Date.now()}`;
     const fileSizeFormatted = selectedFile ? formatBytes(selectedFile.size) : (newDocForm.fileType === 'video' ? '45 MB' : '3.4 MB');
 
+    // Save actual uploaded file binary to IndexedDB for reliable permanent persistence
+    let finalFileUrl = selectedFilePreviewUrl || undefined;
+    if (selectedFile) {
+      try {
+        const storedUrl = await saveFileToStorage(docId, selectedFile, selectedFile.name);
+        if (storedUrl) {
+          finalFileUrl = storedUrl;
+        }
+      } catch (storageErr) {
+        console.warn('Failed to store in IndexedDB, fallback to memory url:', storageErr);
+      }
+    }
+
     // Build specialized slides or content pages for preview
     const cleanTitle = newDocForm.title.trim();
     const cleanDesc = newDocForm.description.trim() || 'مستند استراتيجي محمي وخاص ببوابة MMG VIP.';
@@ -358,7 +372,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       watermarkEnabled: true,
       downloadRestricted: true,
       viewsCount: 0,
-      uploadedFileUrl: selectedFilePreviewUrl || undefined,
+      uploadedFileUrl: finalFileUrl,
       originalFileName: selectedFile?.name || `${cleanTitle}.${newDocForm.fileType === 'pdf' ? 'pdf' : newDocForm.fileType === 'video' ? 'mp4' : 'pptx'}`,
       mimeType: selectedFile?.type,
       contentPages: [
@@ -397,12 +411,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           ]
         }
       ],
-      videoUrl: selectedFilePreviewUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+      videoUrl: finalFileUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
     };
 
     onAddDocument(newDoc);
     setIsUploading(false);
-    resetDocModal();
+    resetDocModal(true);
   };
 
   const handleCreateProject = (e: React.FormEvent) => {
@@ -472,9 +486,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <h1 className="text-2xl font-black text-white tracking-tight font-sans">
               إدارة بوابة Modern Media Global وحماية المستندات
             </h1>
-            <p className="text-xs md:text-sm text-zinc-400 mt-1">
-              متابعة المشاهدات الحية، تخصيص العلامة المائية الديناميكية لـ MMG، وسجل تدقيق الجلسات بدون ووردبريس.
-            </p>
           </div>
         </div>
 

@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // MMG VIP Documents collection
+    match /documents/{documentId} {
+      allow read, write: if true;
+    }
+
+    // Audit logs for live tracking and screenshot shield events
+    match /auditLogs/{logId} {
+      allow read, write: if true;
+    }
+
+    // VIP Clients list
+    match /clients/{clientId} {
+      allow read, write: if true;
+    }
+
+    // Global settings such as watermark settings
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+  }
+}

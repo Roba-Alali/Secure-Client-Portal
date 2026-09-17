@@ -74,7 +74,31 @@ export const getStoredDocuments = (): DocumentItem[] => {
 };
 
 export const saveStoredDocuments = (docs: DocumentItem[]) => {
-  localStorage.setItem(STORAGE_KEYS.DOCUMENTS, JSON.stringify(deduplicateById(docs)));
+  try {
+    const cleanDocs = deduplicateById(docs).map((doc) => {
+      // If uploadedFileUrl is a huge data URL, avoid blowing up localStorage 5MB quota
+      if (doc.uploadedFileUrl && doc.uploadedFileUrl.startsWith('data:') && doc.uploadedFileUrl.length > 500000) {
+        return {
+          ...doc,
+          uploadedFileUrl: `indexeddb://${doc.id}`
+        };
+      }
+      return doc;
+    });
+    localStorage.setItem(STORAGE_KEYS.DOCUMENTS, JSON.stringify(cleanDocs));
+  } catch (err) {
+    console.warn('[Storage] LocalStorage quota exceeded for documents list:', err);
+    try {
+      // Emergency stripped save
+      const strippedDocs = docs.map((d) => ({
+        ...d,
+        uploadedFileUrl: d.uploadedFileUrl && d.uploadedFileUrl.length > 1000 ? `indexeddb://${d.id}` : d.uploadedFileUrl
+      }));
+      localStorage.setItem(STORAGE_KEYS.DOCUMENTS, JSON.stringify(deduplicateById(strippedDocs)));
+    } catch {
+      // ignore
+    }
+  }
 };
 
 export const getStoredWatermarkConfig = (): WatermarkConfig => {
