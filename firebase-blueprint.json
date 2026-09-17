@@ -54,6 +54,20 @@
       },
       "required": ["id", "name", "email", "accessPin"]
     },
+    "Project": {
+      "title": "Project",
+      "description": "Dedicated client project category",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string" },
+        "clientIds": { "type": "array" }
+      },
+      "required": ["id", "title"]
+    },
     "WatermarkSettings": {
       "title": "WatermarkSettings",
       "description": "Dynamic watermark configuration",
@@ -84,6 +98,10 @@
     "/clients/{clientId}": {
       "schema": "Client",
       "description": "Collection of authorized clients"
+    },
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Collection of MMG projects"
     },
     "/settings/watermark": {
       "schema": "WatermarkSettings",

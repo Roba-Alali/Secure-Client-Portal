@@ -21,6 +21,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // MMG Projects collection
+    match /projects/{projectId} {
+      allow read, write: if true;
+    }
+
     // Global settings such as watermark settings
     match /settings/{settingId} {
       allow read, write: if true;

@@ -33,6 +33,12 @@ import {
   listenToFirestoreAuditLogs,
   saveWatermarkConfigToFirestore,
   listenToFirestoreWatermark,
+  saveClientToFirestore,
+  deleteClientFromFirestore,
+  listenToFirestoreClients,
+  saveProjectToFirestore,
+  deleteProjectFromFirestore,
+  listenToFirestoreProjects,
   testConnection
 } from './lib/firebase';
 import { Navbar } from './components/Navbar';
@@ -152,10 +158,42 @@ export default function App() {
       }
     });
 
+    // Listen to remote clients
+    const unsubClients = listenToFirestoreClients((remoteClients) => {
+      if (remoteClients && remoteClients.length > 0) {
+        setClients((prev) => {
+          const merged = [...remoteClients];
+          for (const local of prev) {
+            if (!merged.some((c) => c.id === local.id)) {
+              merged.push(local);
+            }
+          }
+          return merged;
+        });
+      }
+    });
+
+    // Listen to remote projects
+    const unsubProjects = listenToFirestoreProjects((remoteProjects) => {
+      if (remoteProjects && remoteProjects.length > 0) {
+        setProjects((prev) => {
+          const merged = [...remoteProjects];
+          for (const local of prev) {
+            if (!merged.some((p) => p.id === local.id)) {
+              merged.push(local);
+            }
+          }
+          return merged;
+        });
+      }
+    });
+
     return () => {
       unsubDocs();
       unsubLogs();
       unsubWatermark();
+      unsubClients();
+      unsubProjects();
     };
   }, []);
 
@@ -234,6 +272,9 @@ export default function App() {
 
   const handleAddClient = (newClient: ClientUser) => {
     setClients((prev) => [newClient, ...prev]);
+    saveClientToFirestore(newClient).catch((err) => {
+      console.warn('[Firestore] Client save error:', err);
+    });
   };
 
   const handleUpdateClient = (updatedClient: ClientUser) => {
@@ -243,20 +284,54 @@ export default function App() {
     if (currentClient.id === updatedClient.id) {
       setCurrentClient(updatedClient);
     }
+    saveClientToFirestore(updatedClient).catch((err) => {
+      console.warn('[Firestore] Client update error:', err);
+    });
   };
 
   const handleDeleteClient = (id: string) => {
     setClients((prev) => prev.filter((c) => c.id !== id));
+    deleteClientFromFirestore(id).catch((err) => {
+      console.warn('[Firestore] Client delete error:', err);
+    });
   };
 
   const handleAddProject = (newProj: Project) => {
     setProjects((prev) => [newProj, ...prev]);
+    saveProjectToFirestore(newProj).catch((err) => {
+      console.warn('[Firestore] Project save error:', err);
+    });
+  };
+
+  const handleUpdateProject = (updatedProj: Project) => {
+    setProjects((prev) =>
+      prev.map((p) => (p.id === updatedProj.id ? updatedProj : p))
+    );
+    saveProjectToFirestore(updatedProj).catch((err) => {
+      console.warn('[Firestore] Project update error:', err);
+    });
+  };
+
+  const handleDeleteProject = (id: string) => {
+    setProjects((prev) => prev.filter((p) => p.id !== id));
+    deleteProjectFromFirestore(id).catch((err) => {
+      console.warn('[Firestore] Project delete error:', err);
+    });
   };
 
   const handleAddDocument = (newDoc: DocumentItem) => {
     setDocuments((prev) => [newDoc, ...prev]);
     saveDocumentToFirestore(newDoc).catch((err) => {
       console.warn('[Firestore] Document save error:', err);
+    });
+  };
+
+  const handleUpdateDocument = (updatedDoc: DocumentItem) => {
+    setDocuments((prev) =>
+      prev.map((d) => (d.id === updatedDoc.id ? updatedDoc : d))
+    );
+    saveDocumentToFirestore(updatedDoc).catch((err) => {
+      console.warn('[Firestore] Document update error:', err);
     });
   };
 
@@ -314,7 +389,10 @@ export default function App() {
                 onUpdateClient={handleUpdateClient}
                 onDeleteClient={handleDeleteClient}
                 onAddProject={handleAddProject}
+                onUpdateProject={handleUpdateProject}
+                onDeleteProject={handleDeleteProject}
                 onAddDocument={handleAddDocument}
+                onUpdateDocument={handleUpdateDocument}
                 onDeleteDocument={handleDeleteDocument}
                 onMarkNotificationsRead={handleMarkNotificationsRead}
                 onPreviewDocument={(doc, client) => {

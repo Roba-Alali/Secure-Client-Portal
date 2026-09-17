@@ -69,7 +69,10 @@ interface AdminDashboardProps {
   onUpdateClient: (client: ClientUser) => void;
   onDeleteClient: (id: string) => void;
   onAddProject: (project: Project) => void;
+  onUpdateProject: (project: Project) => void;
+  onDeleteProject: (id: string) => void;
   onAddDocument: (doc: DocumentItem) => void;
+  onUpdateDocument: (doc: DocumentItem) => void;
   onDeleteDocument: (id: string) => void;
   onMarkNotificationsRead: () => void;
   onPreviewDocument: (doc: DocumentItem, client: ClientUser) => void;
@@ -88,7 +91,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onUpdateClient,
   onDeleteClient,
   onAddProject,
+  onUpdateProject,
+  onDeleteProject,
   onAddDocument,
+  onUpdateDocument,
   onDeleteDocument,
   onMarkNotificationsRead,
   onPreviewDocument
@@ -152,6 +158,190 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Watermark local edit state
   const [localWm, setLocalWm] = useState<WatermarkConfig>({ ...watermarkConfig });
   const [wmSavedNotice, setWmSavedNotice] = useState(false);
+
+  // ================= EDIT CLIENT STATE & HANDLERS =================
+  const [editingClient, setEditingClient] = useState<ClientUser | null>(null);
+  const [editClientForm, setEditClientForm] = useState({
+    name: '',
+    nameEn: '',
+    email: '',
+    company: '',
+    companyEn: '',
+    phone: '',
+    status: 'active' as 'active' | 'suspended' | 'pending',
+    accessExpiry: '2026-12-31',
+    allowedIp: '',
+    assignedProjectIds: [] as string[]
+  });
+
+  const startEditClient = (client: ClientUser) => {
+    setEditingClient(client);
+    setEditClientForm({
+      name: client.name,
+      nameEn: client.nameEn || client.name,
+      email: client.email,
+      company: client.company,
+      companyEn: client.companyEn || client.company,
+      phone: client.phone || '',
+      status: client.status,
+      accessExpiry: client.accessExpiry || '2026-12-31',
+      allowedIp: client.allowedIp || client.ipAddress || '',
+      assignedProjectIds: [...client.assignedProjectIds]
+    });
+  };
+
+  const handleSaveEditClient = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingClient || !editClientForm.name.trim() || !editClientForm.email.trim()) return;
+
+    const updated: ClientUser = {
+      ...editingClient,
+      name: editClientForm.name.trim(),
+      nameEn: editClientForm.nameEn.trim() || editClientForm.name.trim(),
+      email: editClientForm.email.trim(),
+      company: editClientForm.company.trim(),
+      companyEn: editClientForm.companyEn.trim() || editClientForm.company.trim(),
+      phone: editClientForm.phone.trim() || undefined,
+      status: editClientForm.status,
+      accessExpiry: editClientForm.accessExpiry,
+      allowedIp: editClientForm.allowedIp.trim() || undefined,
+      ipAddress: editClientForm.allowedIp.trim() || editingClient.ipAddress,
+      assignedProjectIds: editClientForm.assignedProjectIds
+    };
+
+    onUpdateClient(updated);
+    setEditingClient(null);
+  };
+
+  // ================= EDIT PROJECT STATE & HANDLERS =================
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [editProjectForm, setEditProjectForm] = useState({
+    title: '',
+    category: '',
+    description: '',
+    status: 'active' as 'active' | 'in-progress' | 'completed',
+    clientIds: [] as string[]
+  });
+
+  const startEditProject = (proj: Project) => {
+    setEditingProject(proj);
+    setEditProjectForm({
+      title: proj.title,
+      category: proj.category,
+      description: proj.description,
+      status: proj.status,
+      clientIds: [...proj.clientIds]
+    });
+  };
+
+  const handleSaveEditProject = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProject || !editProjectForm.title.trim()) return;
+
+    const updated: Project = {
+      ...editingProject,
+      title: editProjectForm.title.trim(),
+      titleEn: editProjectForm.title.trim(),
+      category: editProjectForm.category,
+      categoryEn: editProjectForm.category,
+      description: editProjectForm.description.trim() || 'مشروع استراتيجي مخصص لعملاء MMG VIP.',
+      descriptionEn: editProjectForm.description.trim() || 'MMG VIP Strategic Dedicated Project.',
+      status: editProjectForm.status,
+      clientIds: editProjectForm.clientIds,
+      updatedAt: 'اليوم (معدّل)'
+    };
+
+    onUpdateProject(updated);
+    setEditingProject(null);
+  };
+
+  // ================= EDIT DOCUMENT STATE & HANDLERS =================
+  const [editingDocument, setEditingDocument] = useState<DocumentItem | null>(null);
+  const [editDocForm, setEditDocForm] = useState({
+    title: '',
+    description: '',
+    projectId: '',
+    fileType: 'pdf' as FileType,
+    isConfidential: true,
+    watermarkEnabled: true,
+    downloadRestricted: true,
+    pageCount: 5,
+    duration: '03:15'
+  });
+
+  const startEditDocument = (doc: DocumentItem) => {
+    setEditingDocument(doc);
+    setEditDocForm({
+      title: doc.title,
+      description: doc.description,
+      projectId: doc.projectId,
+      fileType: doc.fileType,
+      isConfidential: doc.isConfidential ?? true,
+      watermarkEnabled: doc.watermarkEnabled ?? true,
+      downloadRestricted: doc.downloadRestricted ?? true,
+      pageCount: doc.pageCount || (doc.fileType === 'presentation' ? 6 : 5),
+      duration: doc.duration || '03:15'
+    });
+  };
+
+  const handleSaveEditDocument = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDocument || !editDocForm.title.trim() || !editDocForm.projectId) return;
+
+    const updated: DocumentItem = {
+      ...editingDocument,
+      title: editDocForm.title.trim(),
+      titleEn: editDocForm.title.trim(),
+      description: editDocForm.description.trim() || 'مستند استراتيجي محمي وخاص ببوابة MMG VIP.',
+      descriptionEn: editDocForm.description.trim() || 'MMG VIP Protected Document.',
+      projectId: editDocForm.projectId,
+      fileType: editDocForm.fileType,
+      isConfidential: editDocForm.isConfidential,
+      watermarkEnabled: editDocForm.watermarkEnabled,
+      downloadRestricted: editDocForm.downloadRestricted,
+      pageCount: editDocForm.fileType === 'video' ? undefined : editDocForm.pageCount,
+      duration: editDocForm.fileType === 'video' ? editDocForm.duration : undefined
+    };
+
+    onUpdateDocument(updated);
+    setEditingDocument(null);
+  };
+
+  // ================= EDIT PERMISSIONS STATE & HANDLERS =================
+  const [editingPermissionsClient, setEditingPermissionsClient] = useState<ClientUser | null>(null);
+  const [permissionsForm, setPermissionsForm] = useState({
+    status: 'active' as 'active' | 'suspended' | 'pending',
+    allowedIp: '',
+    accessExpiry: '2026-12-31',
+    assignedProjectIds: [] as string[]
+  });
+
+  const startEditPermissions = (client: ClientUser) => {
+    setEditingPermissionsClient(client);
+    setPermissionsForm({
+      status: client.status,
+      allowedIp: client.allowedIp || client.ipAddress || '',
+      accessExpiry: client.accessExpiry || '2026-12-31',
+      assignedProjectIds: [...client.assignedProjectIds]
+    });
+  };
+
+  const handleSavePermissions = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPermissionsClient) return;
+
+    const updated: ClientUser = {
+      ...editingPermissionsClient,
+      status: permissionsForm.status,
+      allowedIp: permissionsForm.allowedIp.trim() || undefined,
+      ipAddress: permissionsForm.allowedIp.trim() || editingPermissionsClient.ipAddress,
+      accessExpiry: permissionsForm.accessExpiry,
+      assignedProjectIds: permissionsForm.assignedProjectIds
+    };
+
+    onUpdateClient(updated);
+    setEditingPermissionsClient(null);
+  };
 
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -819,6 +1009,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <td className="p-3">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
+                          onClick={() => startEditClient(client)}
+                          className="p-1.5 rounded hover:bg-blue-500/20 text-blue-400 transition-colors"
+                          title="تعديل بيانات العميل"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => {
                             const updated = {
                               ...client,
@@ -952,6 +1149,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </span>
                     </div>
 
+                    <div className="flex items-center gap-2 mb-2">
+                      <button
+                        onClick={() => startEditProject(proj)}
+                        className="flex-1 py-1.5 bg-zinc-900 hover:bg-blue-500/20 text-zinc-300 hover:text-blue-400 rounded-lg text-xs font-semibold border border-zinc-800 hover:border-blue-500/40 transition-all flex items-center justify-center gap-1.5"
+                        title="تعديل بيانات المشروع وتعيين العملاء"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                        <span>تعديل المشروع</span>
+                      </button>
+                      <button
+                        onClick={() => onDeleteProject(proj.id)}
+                        className="p-1.5 bg-zinc-900 hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 rounded-lg border border-zinc-800 hover:border-rose-500/40 transition-all"
+                        title="حذف المشروع"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
                     <button
                       onClick={() => {
                         setNewDocForm({
@@ -1046,7 +1261,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         {doc.viewsCount}
                       </td>
                       <td className="p-3">
-                        <div className="flex items-center justify-center gap-2">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => startEditDocument(doc)}
+                            className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 border border-zinc-700/60 transition-colors flex items-center gap-1 text-[11px]"
+                            title="تعديل بيانات المستند والمشروع والصلاحيات"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                            <span>تعديل</span>
+                          </button>
                           <button
                             onClick={() => onPreviewDocument(doc, clients[0])}
                             className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-[#ff4b4f] transition-colors flex items-center gap-1 text-[11px]"
@@ -1075,24 +1298,50 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* ======================= TAB 5: ACCESS CONTROL ======================= */}
       {activeAdminTab === 'access_control' && (
-        <div className="bg-[#121216] border border-zinc-800 rounded-2xl p-6 shadow-xl space-y-4">
-          <div>
-            <h2 className="text-lg font-bold text-white">مصفوفة التحكم في الصلاحيات (Access Control Matrix)</h2>
-            <p className="text-xs text-zinc-400">تحديد وصول كل عميل إلى المشاريع وأنواع الملفات المصرح بها بشكل فوري.</p>
+        <div className="bg-[#121216] border border-zinc-800 rounded-2xl p-6 shadow-xl space-y-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Key className="w-5 h-5 text-[#E40107]" />
+                <span>مصفوفة التحكم في الصلاحيات والأمان (Access Control & Permissions)</span>
+              </h2>
+              <p className="text-xs text-zinc-400 mt-1">
+                التحكم الشامل في أذونات كل عميل، تقييد عناوين IP، تواريخ انتهاء الصلاحية، وتخصيص المشاريع.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const allProjectIds = projects.map((p) => p.id);
+                  clients.forEach((c) => {
+                    onUpdateClient({ ...c, assignedProjectIds: allProjectIds });
+                  });
+                }}
+                className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
+                title="منح حق الوصول لجميع المشاريع لجميع العملاء دفعة واحدة"
+              >
+                <CheckCircle className="w-3.5 h-3.5" />
+                <span>منح كافة المشاريع للجميع</span>
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-right text-xs">
               <thead className="text-zinc-400 bg-zinc-950/80 border-b border-zinc-800">
                 <tr>
-                  <th className="p-3">اسم العميل والشركة</th>
+                  <th className="p-3 min-w-[160px]">اسم العميل والشركة</th>
+                  <th className="p-3 text-center">حالة الحساب</th>
                   {projects.map((p) => (
-                    <th key={p.id} className="p-3 text-center">
-                      <div className="font-bold text-white">{p.title}</div>
-                      <div className="text-[10px] text-zinc-500 font-mono">{p.category}</div>
+                    <th key={p.id} className="p-3 text-center min-w-[120px]">
+                      <div className="font-bold text-white truncate max-w-[140px]">{p.title}</div>
+                      <div className="text-[10px] text-zinc-500 font-mono truncate max-w-[140px]">{p.category}</div>
                     </th>
                   ))}
                   <th className="p-3 text-center">تقييد عنوان IP</th>
+                  <th className="p-3 text-center">انتهاء الصلاحية</th>
+                  <th className="p-3 text-center min-w-[130px]">إدارة الصلاحيات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800">
@@ -1101,6 +1350,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <td className="p-3">
                       <div className="font-bold text-white">{client.name}</div>
                       <div className="text-[11px] text-zinc-400">{client.company}</div>
+                    </td>
+
+                    <td className="p-3 text-center">
+                      <button
+                        onClick={() => {
+                          const updated = {
+                            ...client,
+                            status: client.status === 'active' ? ('suspended' as const) : ('active' as const)
+                          };
+                          onUpdateClient(updated);
+                        }}
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold border transition-colors ${
+                          client.status === 'active'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+                            : 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20'
+                        }`}
+                        title="تبديل حالة الحساب"
+                      >
+                        {client.status === 'active' ? 'نشط' : 'موقوف'}
+                      </button>
                     </td>
 
                     {projects.map((p) => {
@@ -1114,20 +1383,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 : [...client.assignedProjectIds, p.id];
                               onUpdateClient({ ...client, assignedProjectIds: newAssigned });
                             }}
-                            className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
                               isAssigned
-                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                : 'bg-zinc-800 text-zinc-500 border border-zinc-700 hover:text-white'
+                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'
+                                : 'bg-zinc-900 text-zinc-500 border border-zinc-800 hover:text-white hover:border-zinc-700'
                             }`}
+                            title={isAssigned ? 'انقر للحجب' : 'انقر لمنح الصلاحية'}
                           >
-                            {isAssigned ? '✓ مصرح بالوصول' : 'محجوب'}
+                            {isAssigned ? '✓ مصرح' : 'محجوب'}
                           </button>
                         </td>
                       );
                     })}
 
-                    <td className="p-3 text-center font-mono text-zinc-400" dir="ltr">
-                      {client.ipAddress ? `مسموح (${client.ipAddress})` : 'أي عنوان IP'}
+                    <td className="p-3 text-center font-mono text-zinc-300" dir="ltr">
+                      {client.allowedIp || client.ipAddress ? (
+                        <span className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[11px]">
+                          {client.allowedIp || client.ipAddress}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-500 text-[11px]">أي عنوان IP</span>
+                      )}
+                    </td>
+
+                    <td className="p-3 text-center font-mono text-zinc-400">
+                      {client.accessExpiry || 'مستمر'}
+                    </td>
+
+                    <td className="p-3 text-center">
+                      <button
+                        onClick={() => startEditPermissions(client)}
+                        className="px-3 py-1.5 rounded-lg bg-[#E40107]/15 hover:bg-[#E40107]/25 text-[#ff4b4f] border border-[#E40107]/40 text-xs font-bold transition-all flex items-center justify-center gap-1.5 mx-auto shadow-sm"
+                        title="تعديل الصلاحيات بالكامل"
+                      >
+                        <Key className="w-3.5 h-3.5" />
+                        <span>تعديل الصلاحيات</span>
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -2167,6 +2458,700 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <span>حفظ وتأمين الملف</span>
                     </>
                   )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================= MODAL: EDIT CLIENT ======================= */}
+      {editingClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-[#121216] border border-zinc-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl my-8">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <Edit className="w-5 h-5 text-blue-400" />
+                <div>
+                  <h3 className="text-base font-bold text-white">تعديل بيانات العميل الكاملة</h3>
+                  <p className="text-[11px] text-zinc-400">{editingClient.name} ({editingClient.company})</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingClient(null)}
+                className="text-zinc-500 hover:text-white p-1 rounded-lg transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditClient} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-zinc-300 mb-1 font-semibold">
+                    الاسم الكامل (عربي) <span className="text-[#E40107]">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editClientForm.name}
+                    onChange={(e) => setEditClientForm({ ...editClientForm, name: e.target.value })}
+                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-300 mb-1 font-semibold">الاسم بالإنجليزية</label>
+                  <input
+                    type="text"
+                    value={editClientForm.nameEn}
+                    onChange={(e) => setEditClientForm({ ...editClientForm, nameEn: e.target.value })}
+                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-zinc-300 mb-1 font-semibold">
+                    البريد الإلكتروني لتسجيل الدخول <span className="text-[#E40107]">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={editClientForm.email}
+                    onChange={(e) => setEditClientForm({ ...editClientForm, email: e.target.value })}
+                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500"
+                    dir="ltr"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-300 mb-1 font-semibold">رقم الهاتف / الجوال</label>
+                  <input
+                    type="text"
+                    value={editClientForm.phone}
+                    onChange={(e) => setEditClientForm({ ...editClientForm, phone: e.target.value })}
+                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-zinc-300 mb-1 font-semibold">اسم الشركة / المؤسسة</label>
+                  <input
+                    type="text"
+                    required
+                    value={editClientForm.company}
+                    onChange={(e) => setEditClientForm({ ...editClientForm, company: e.target.value })}
+                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-300 mb-1 font-semibold">حالة الحساب</label>
+                  <select
+                    value={editClientForm.status}
+                    onChange={(e) => setEditClientForm({ ...editClientForm, status: e.target.value as any })}
+                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="active">نشط ومصرح له بالدخول (Active)</option>
+                    <option value="suspended">موقوف مؤقتاً (Suspended)</option>
+                    <option value="pending">قيد المراجعة (Pending)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-zinc-300 mb-1 font-semibold">تاريخ انتهاء الصلاحية</label>
+                  <input
+                    type="date"
+                    value={editClientForm.accessExpiry}
+                    onChange={(e) => setEditClientForm({ ...editClientForm, accessExpiry: e.target.value })}
+                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-300 mb-1 font-semibold">تقييد عنوان IP المسموح</label>
+                  <input
+                    type="text"
+                    value={editClientForm.allowedIp}
+                    onChange={(e) => setEditClientForm({ ...editClientForm, allowedIp: e.target.value })}
+                    placeholder="فارغ = أي عنوان IP"
+                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-zinc-300 font-semibold">المشاريع المخصصة لهذا العميل:</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditClientForm({ ...editClientForm, assignedProjectIds: projects.map(p => p.id) })}
+                      className="text-[10px] text-blue-400 hover:underline"
+                    >
+                      تحديد الكل
+                    </button>
+                    <span className="text-zinc-600">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setEditClientForm({ ...editClientForm, assignedProjectIds: [] })}
+                      className="text-[10px] text-zinc-400 hover:underline"
+                    >
+                      إلغاء التحديد
+                    </button>
+                  </div>
+                </div>
+                <div className="max-h-36 overflow-y-auto space-y-1.5 bg-[#09090b] p-3 rounded-xl border border-zinc-800">
+                  {projects.map((proj) => {
+                    const isSelected = editClientForm.assignedProjectIds.includes(proj.id);
+                    return (
+                      <label
+                        key={proj.id}
+                        className="flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-zinc-800/60 cursor-pointer transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setEditClientForm({
+                                ...editClientForm,
+                                assignedProjectIds: [...editClientForm.assignedProjectIds, proj.id]
+                              });
+                            } else {
+                              setEditClientForm({
+                                ...editClientForm,
+                                assignedProjectIds: editClientForm.assignedProjectIds.filter(id => id !== proj.id)
+                              });
+                            }
+                          }}
+                          className="rounded border-zinc-700 text-blue-600 focus:ring-blue-500/20"
+                        />
+                        <span className="text-zinc-200 font-medium">{proj.title}</span>
+                        <span className="text-[10px] text-zinc-500 mr-auto font-mono">{proj.category}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-3 border-t border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingClient(null)}
+                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2.5 rounded-xl font-medium transition-colors"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl transition-colors shadow-lg shadow-blue-900/40 flex items-center justify-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>حفظ التعديلات في السحابة</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================= MODAL: EDIT PROJECT ======================= */}
+      {editingProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-[#121216] border border-zinc-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl my-8">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <FolderKanban className="w-5 h-5 text-[#E40107]" />
+                <div>
+                  <h3 className="text-base font-bold text-white">تعديل بيانات المشروع المخصص</h3>
+                  <p className="text-[11px] text-zinc-400">{editingProject.title}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingProject(null)}
+                className="text-zinc-500 hover:text-white p-1 rounded-lg transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditProject} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-zinc-300 mb-1 font-semibold">
+                  اسم المشروع <span className="text-[#E40107]">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editProjectForm.title}
+                  onChange={(e) => setEditProjectForm({ ...editProjectForm, title: e.target.value })}
+                  className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-[#E40107]"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-zinc-300 mb-1 font-semibold">تصنيف المشروع</label>
+                  <select
+                    value={editProjectForm.category}
+                    onChange={(e) => setEditProjectForm({ ...editProjectForm, category: e.target.value })}
+                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-[#E40107]"
+                  >
+                    <option value="استراتيجية تسويقية وتواصل إعلامي">استراتيجية تسويقية وتواصل إعلامي</option>
+                    <option value="إنتاج إعلاني ومحتوى مرئي">إنتاج إعلاني ومحتوى مرئي</option>
+                    <option value="تطوير هوية بصرية وبراندينج">تطوير هوية بصرية وبراندينج</option>
+                    <option value="حملات رقمية وعلاقات عامة">حملات رقمية وعلاقات عامة</option>
+                    <option value="شراكات استثمارية واستشارات">شراكات استثمارية واستشارات</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-zinc-300 mb-1 font-semibold">حالة المشروع</label>
+                  <select
+                    value={editProjectForm.status}
+                    onChange={(e) => setEditProjectForm({ ...editProjectForm, status: e.target.value as any })}
+                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-[#E40107]"
+                  >
+                    <option value="active">نشط (Active)</option>
+                    <option value="in-progress">قيد التنفيذ (In Progress)</option>
+                    <option value="completed">مكتمل (Completed)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-zinc-300 mb-1 font-semibold">وصف المشروع ونطاق العمل</label>
+                <textarea
+                  rows={2}
+                  value={editProjectForm.description}
+                  onChange={(e) => setEditProjectForm({ ...editProjectForm, description: e.target.value })}
+                  placeholder="وصف مختصر للأهداف والمستندات..."
+                  className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-[#E40107]"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-zinc-300 font-semibold">العملاء المصرح لهم بالاطلاع على هذا المشروع:</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditProjectForm({ ...editProjectForm, clientIds: clients.map(c => c.id) })}
+                      className="text-[10px] text-[#ff4b4f] hover:underline"
+                    >
+                      تحديد جميع العملاء
+                    </button>
+                    <span className="text-zinc-600">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setEditProjectForm({ ...editProjectForm, clientIds: [] })}
+                      className="text-[10px] text-zinc-400 hover:underline"
+                    >
+                      إلغاء التحديد
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-36 overflow-y-auto space-y-1.5 bg-[#09090b] p-3 rounded-xl border border-zinc-800">
+                  {clients.map((client) => {
+                    const isSelected = editProjectForm.clientIds.includes(client.id);
+                    return (
+                      <label
+                        key={client.id}
+                        className="flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-zinc-800/60 cursor-pointer transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setEditProjectForm({
+                                ...editProjectForm,
+                                clientIds: [...editProjectForm.clientIds, client.id]
+                              });
+                            } else {
+                              setEditProjectForm({
+                                ...editProjectForm,
+                                clientIds: editProjectForm.clientIds.filter(id => id !== client.id)
+                              });
+                            }
+                          }}
+                          className="rounded border-zinc-700 text-[#E40107] focus:ring-[#E40107]/20"
+                        />
+                        <span className="text-zinc-200 font-medium">{client.name}</span>
+                        <span className="text-[10px] text-zinc-400 mr-auto">({client.company})</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-3 border-t border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingProject(null)}
+                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2.5 rounded-xl font-medium transition-colors"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-[#E40107] hover:bg-[#c90005] text-white font-bold py-2.5 rounded-xl transition-colors shadow-lg shadow-red-950/40 flex items-center justify-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>حفظ تعديلات المشروع</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================= MODAL: EDIT DOCUMENT ======================= */}
+      {editingDocument && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-[#121216] border border-zinc-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl my-8">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-blue-400" />
+                <div>
+                  <h3 className="text-base font-bold text-white">تعديل بيانات المستند والمشروع والصلاحيات</h3>
+                  <p className="text-[11px] text-zinc-400">{editingDocument.title}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingDocument(null)}
+                className="text-zinc-500 hover:text-white p-1 rounded-lg transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditDocument} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-zinc-300 mb-1 font-semibold">
+                  عنوان المستند <span className="text-[#E40107]">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editDocForm.title}
+                  onChange={(e) => setEditDocForm({ ...editDocForm, title: e.target.value })}
+                  className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-zinc-300 mb-1 font-semibold">
+                  المشروع التابع له <span className="text-[#E40107]">*</span>
+                </label>
+                <select
+                  required
+                  value={editDocForm.projectId}
+                  onChange={(e) => setEditDocForm({ ...editDocForm, projectId: e.target.value })}
+                  className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-blue-500"
+                >
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.title} ({p.category})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-zinc-300 mb-1 font-semibold">نوع الملف</label>
+                  <select
+                    value={editDocForm.fileType}
+                    onChange={(e) => setEditDocForm({ ...editDocForm, fileType: e.target.value as FileType })}
+                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="pdf">مستند استراتيجي (PDF)</option>
+                    <option value="presentation">عرض تقديمي تفاعلي (Presentation)</option>
+                    <option value="video">محتوى إعلاني / فيديو (Video MP4)</option>
+                  </select>
+                </div>
+
+                <div>
+                  {editDocForm.fileType === 'video' ? (
+                    <div>
+                      <label className="block text-zinc-300 mb-1 font-semibold">مدة العرض</label>
+                      <input
+                        type="text"
+                        value={editDocForm.duration}
+                        onChange={(e) => setEditDocForm({ ...editDocForm, duration: e.target.value })}
+                        placeholder="03:15"
+                        className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-blue-500 font-mono"
+                        dir="ltr"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-zinc-300 mb-1 font-semibold">عدد الصفحات</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={200}
+                        value={editDocForm.pageCount}
+                        onChange={(e) => setEditDocForm({ ...editDocForm, pageCount: parseInt(e.target.value) || 1 })}
+                        className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-blue-500 font-mono"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-zinc-300 mb-1 font-semibold">وصف المستند</label>
+                <textarea
+                  rows={2}
+                  value={editDocForm.description}
+                  onChange={(e) => setEditDocForm({ ...editDocForm, description: e.target.value })}
+                  placeholder="وصف لمحتويات المستند والتوصيات..."
+                  className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              {/* Security Switches */}
+              <div className="p-3 bg-[#09090b] rounded-xl border border-zinc-800 space-y-2.5">
+                <span className="text-[11px] font-semibold text-zinc-300 block">إعدادات الحماية والأمان المطبقة:</span>
+                
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editDocForm.watermarkEnabled}
+                    onChange={(e) => setEditDocForm({ ...editDocForm, watermarkEnabled: e.target.checked })}
+                    className="rounded border-zinc-700 text-blue-600 focus:ring-blue-500/20"
+                  />
+                  <span className="text-zinc-200">تفعيل العلامة المائية الديناميكية ببيانات العميل</span>
+                </label>
+
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editDocForm.downloadRestricted}
+                    onChange={(e) => setEditDocForm({ ...editDocForm, downloadRestricted: e.target.checked })}
+                    className="rounded border-zinc-700 text-blue-600 focus:ring-blue-500/20"
+                  />
+                  <span className="text-zinc-200">حظر التحميل المباشر وتفعيل الحماية من النسخ</span>
+                </label>
+
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editDocForm.isConfidential}
+                    onChange={(e) => setEditDocForm({ ...editDocForm, isConfidential: e.target.checked })}
+                    className="rounded border-zinc-700 text-blue-600 focus:ring-blue-500/20"
+                  />
+                  <span className="text-zinc-200">وسم الملف كـ "سري للغاية ومحمي بحقوق MMG"</span>
+                </label>
+              </div>
+
+              <div className="flex gap-2 pt-3 border-t border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingDocument(null)}
+                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2.5 rounded-xl font-medium transition-colors"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl transition-colors shadow-lg shadow-blue-900/40 flex items-center justify-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>حفظ تعديلات المستند</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================= MODAL: EDIT PERMISSIONS ======================= */}
+      {editingPermissionsClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-[#121216] border border-zinc-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl my-8">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <Key className="w-5 h-5 text-[#E40107]" />
+                <div>
+                  <h3 className="text-base font-bold text-white">إدارة وتعديل الصلاحيات والأمان المتقدم</h3>
+                  <p className="text-[11px] text-zinc-400">{editingPermissionsClient.name} - {editingPermissionsClient.company}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingPermissionsClient(null)}
+                className="text-zinc-500 hover:text-white p-1 rounded-lg transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePermissions} className="space-y-4 text-xs">
+              <div className="p-3 bg-[#09090b] rounded-xl border border-zinc-800 flex items-center justify-between">
+                <div>
+                  <div className="font-bold text-white">{editingPermissionsClient.name}</div>
+                  <div className="text-[11px] text-zinc-400">{editingPermissionsClient.email}</div>
+                </div>
+                <span className="px-2.5 py-1 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 font-mono text-[11px]">
+                  {editingPermissionsClient.company}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-zinc-300 mb-1 font-semibold">حالة الحساب والصلاحية</label>
+                  <select
+                    value={permissionsForm.status}
+                    onChange={(e) => setPermissionsForm({ ...permissionsForm, status: e.target.value as any })}
+                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-[#E40107]"
+                  >
+                    <option value="active">نشط ومصرح له بالدخول (Active)</option>
+                    <option value="suspended">موقوف مؤقتاً (Suspended)</option>
+                    <option value="pending">قيد المراجعة (Pending)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-zinc-300 mb-1 font-semibold">تاريخ انتهاء الصلاحية</label>
+                  <input
+                    type="date"
+                    value={permissionsForm.accessExpiry}
+                    onChange={(e) => setPermissionsForm({ ...permissionsForm, accessExpiry: e.target.value })}
+                    className="w-full bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-[#E40107]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-zinc-300 mb-1 font-semibold">
+                  تقييد عنوان الشبكة (Allowed IP Whitelist)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={permissionsForm.allowedIp}
+                    onChange={(e) => setPermissionsForm({ ...permissionsForm, allowedIp: e.target.value })}
+                    placeholder="مثال: 197.34.12.88 (اتركه فارغاً للسماح من أي عنوان)"
+                    className="flex-1 bg-[#09090b] border border-zinc-700 rounded-xl p-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-[#E40107]"
+                    dir="ltr"
+                  />
+                  {permissionsForm.allowedIp && (
+                    <button
+                      type="button"
+                      onClick={() => setPermissionsForm({ ...permissionsForm, allowedIp: '' })}
+                      className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded-xl text-xs transition-colors"
+                    >
+                      إلغاء التقييد
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-zinc-500 mt-1">
+                  إذا تم تعيين IP محدد، سيتم حظر أي محاولة دخول من أي شبكة أخرى فورياً.
+                </p>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-zinc-300 font-semibold">
+                    المشاريع المصرح للعميل بالاطلاع عليها ({permissionsForm.assignedProjectIds.length} من {projects.length}):
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPermissionsForm({ ...permissionsForm, assignedProjectIds: projects.map(p => p.id) })}
+                      className="text-[10px] text-emerald-400 hover:underline"
+                    >
+                      منح كافة المشاريع
+                    </button>
+                    <span className="text-zinc-600">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setPermissionsForm({ ...permissionsForm, assignedProjectIds: [] })}
+                      className="text-[10px] text-rose-400 hover:underline"
+                    >
+                      حظر كافة المشاريع
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-40 overflow-y-auto space-y-1.5 bg-[#09090b] p-3 rounded-xl border border-zinc-800">
+                  {projects.map((proj) => {
+                    const isSelected = permissionsForm.assignedProjectIds.includes(proj.id);
+                    return (
+                      <label
+                        key={proj.id}
+                        className={`flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-all border ${
+                          isSelected
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-white'
+                            : 'hover:bg-zinc-800/60 border-transparent text-zinc-400'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setPermissionsForm({
+                                ...permissionsForm,
+                                assignedProjectIds: [...permissionsForm.assignedProjectIds, proj.id]
+                              });
+                            } else {
+                              setPermissionsForm({
+                                ...permissionsForm,
+                                assignedProjectIds: permissionsForm.assignedProjectIds.filter(id => id !== proj.id)
+                              });
+                            }
+                          }}
+                          className="rounded border-zinc-700 text-emerald-500 focus:ring-emerald-500/20"
+                        />
+                        <div className="flex-1">
+                          <div className="font-semibold text-xs">{proj.title}</div>
+                          <div className="text-[10px] text-zinc-500">{proj.category}</div>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          isSelected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'
+                        }`}>
+                          {isSelected ? 'مصرح' : 'محجوب'}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="p-3 bg-zinc-950 rounded-xl border border-zinc-800 text-[11px] text-zinc-300 space-y-1">
+                <div className="flex items-center gap-2 text-emerald-400 font-semibold">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>الحماية النشطة تلقائياً لهذا العميل:</span>
+                </div>
+                <p className="text-[10px] text-zinc-400">
+                  العلامة المائية الشاملة + درع منع لقطات الشاشة DLP + تسجيل أوقات القراءة وتنبيهات الدخول الفورية.
+                </p>
+              </div>
+
+              <div className="flex gap-2 pt-3 border-t border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingPermissionsClient(null)}
+                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-2.5 rounded-xl font-medium transition-colors"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-[#E40107] hover:bg-[#c90005] text-white font-bold py-2.5 rounded-xl transition-colors shadow-lg shadow-red-950/40 flex items-center justify-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>تطبيق وحفظ الصلاحيات</span>
                 </button>
               </div>
             </form>

@@ -11,7 +11,7 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { DocumentItem, ViewLog, LoginLog, WatermarkConfig } from '../types';
+import { DocumentItem, ViewLog, LoginLog, WatermarkConfig, Project, ClientUser } from '../types';
 
 // Initialize Firebase App
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -174,6 +174,86 @@ export function listenToFirestoreWatermark(
     (snapshot) => {
       if (snapshot.exists()) {
         onConfigUpdated(snapshot.data() as WatermarkConfig);
+      }
+    },
+    (err) => {
+      handleFirestoreError(err, OperationType.GET, path);
+    }
+  );
+}
+
+// Cloud Sync Helpers for Clients
+export async function saveClientToFirestore(client: ClientUser): Promise<void> {
+  const path = `clients/${client.id}`;
+  try {
+    await setDoc(doc(db, 'clients', client.id), client);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteClientFromFirestore(clientId: string): Promise<void> {
+  const path = `clients/${clientId}`;
+  try {
+    await deleteDoc(doc(db, 'clients', clientId));
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, path);
+  }
+}
+
+export function listenToFirestoreClients(
+  onClientsUpdated: (clients: ClientUser[]) => void
+): () => void {
+  const path = 'clients';
+  return onSnapshot(
+    collection(db, path),
+    (snapshot) => {
+      const clients: ClientUser[] = [];
+      snapshot.forEach((snapDoc) => {
+        clients.push(snapDoc.data() as ClientUser);
+      });
+      if (clients.length > 0) {
+        onClientsUpdated(clients);
+      }
+    },
+    (err) => {
+      handleFirestoreError(err, OperationType.GET, path);
+    }
+  );
+}
+
+// Cloud Sync Helpers for Projects
+export async function saveProjectToFirestore(project: Project): Promise<void> {
+  const path = `projects/${project.id}`;
+  try {
+    await setDoc(doc(db, 'projects', project.id), project);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteProjectFromFirestore(projectId: string): Promise<void> {
+  const path = `projects/${projectId}`;
+  try {
+    await deleteDoc(doc(db, 'projects', projectId));
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, path);
+  }
+}
+
+export function listenToFirestoreProjects(
+  onProjectsUpdated: (projects: Project[]) => void
+): () => void {
+  const path = 'projects';
+  return onSnapshot(
+    collection(db, path),
+    (snapshot) => {
+      const projs: Project[] = [];
+      snapshot.forEach((snapDoc) => {
+        projs.push(snapDoc.data() as Project);
+      });
+      if (projs.length > 0) {
+        onProjectsUpdated(projs);
       }
     },
     (err) => {
