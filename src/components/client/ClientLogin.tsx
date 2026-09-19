@@ -233,7 +233,9 @@ export const ClientLogin: React.FC<ClientLoginProps> = ({
 
   const handleCopyAndFillOtp = () => {
     setEnteredOtp(activeGeneratedOtp);
-    navigator.clipboard?.writeText(activeGeneratedOtp);
+    if (document.hasFocus && document.hasFocus() && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(activeGeneratedOtp).catch(() => {});
+    }
     setIsCopiedOtp(true);
     setTimeout(() => setIsCopiedOtp(false), 2000);
   };

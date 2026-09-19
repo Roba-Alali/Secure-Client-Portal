@@ -117,10 +117,12 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
     setObscureReason(reason);
     onSecurityEvent?.(eventType, reason);
 
-    // 3. Clear clipboard immediately to prevent clipboard scraping
-    if (navigator.clipboard && navigator.clipboard.writeText) {
+    // 3. Clear clipboard safely if focused to prevent clipboard scraping and avoid DOMException
+    if (document.hasFocus && document.hasFocus() && navigator.clipboard && navigator.clipboard.writeText) {
       try {
-        navigator.clipboard.writeText('⚠️ محتوى MMG VIP محمي ومصرح للعميل فقط.');
+        navigator.clipboard.writeText('⚠️ محتوى MMG VIP محمي ومصرح للعميل فقط.').catch(() => {
+          // Guard against asynchronous unhandled rejection when document focus is lost
+        });
       } catch {
         // clipboard access restricted
       }

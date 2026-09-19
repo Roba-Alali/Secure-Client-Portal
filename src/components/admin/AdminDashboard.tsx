@@ -346,7 +346,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
+    if (document.hasFocus && document.hasFocus() && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2500);
   };

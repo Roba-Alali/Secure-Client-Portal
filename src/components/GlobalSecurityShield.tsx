@@ -43,12 +43,14 @@ export const GlobalSecurityShield: React.FC<GlobalSecurityShieldProps> = ({ enab
     setIsBlackedOut(true);
     setBlackoutReason(reason);
 
-    // Overwrite clipboard immediately to sanitize any captured data
-    if (navigator.clipboard && navigator.clipboard.writeText) {
+    // Overwrite clipboard safely only if document has active focus to prevent "Document is not focused" DOMException
+    if (document.hasFocus && document.hasFocus() && navigator.clipboard && navigator.clipboard.writeText) {
       try {
-        navigator.clipboard.writeText('⚠️ محتوى Modern Media Global (MMG VIP) سري ومحمي بموجب اتفاقيات عدم الإفصاح. تم حظر النسخ أو الالتقاط.');
+        navigator.clipboard.writeText('⚠️ محتوى Modern Media Global (MMG VIP) سري ومحمي بموجب اتفاقيات عدم الإفصاح. تم حظر النسخ أو الالتقاط.').catch(() => {
+          // Guard against asynchronous unhandled rejection when document focus is lost mid-call
+        });
       } catch {
-        // clipboard access guarded
+        // Guard synchronous errors
       }
     }
 
