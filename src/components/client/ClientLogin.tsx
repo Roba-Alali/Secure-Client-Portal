@@ -24,6 +24,7 @@ interface ClientLoginProps {
   onRecordLogin: (log: LoginLog, notif?: AdminNotification) => void;
   sessionExpiredReason?: string | null;
   onClearSessionNotice?: () => void;
+  onGoToAdminLogin?: () => void;
 }
 
 export const ClientLogin: React.FC<ClientLoginProps> = ({
@@ -32,7 +33,8 @@ export const ClientLogin: React.FC<ClientLoginProps> = ({
   onAdminLogin,
   onRecordLogin,
   sessionExpiredReason,
-  onClearSessionNotice
+  onClearSessionNotice,
+  onGoToAdminLogin
 }) => {
   // Client Email OTP States
   const [clientEmail, setClientEmail] = useState('');
@@ -505,6 +507,20 @@ export const ClientLogin: React.FC<ClientLoginProps> = ({
                 ))}
               </div>
             </div>
+
+            {/* Independent Admin Portal Access Link */}
+            {onGoToAdminLogin && (
+              <div className="mt-4 pt-3 border-t border-zinc-800/80 text-center">
+                <button
+                  type="button"
+                  onClick={onGoToAdminLogin}
+                  className="w-full py-2 px-3 rounded-xl bg-zinc-950 hover:bg-zinc-900 border border-zinc-800/90 text-xs text-zinc-400 hover:text-zinc-200 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Shield className="w-3.5 h-3.5 text-[#ff4b4f]" />
+                  <span>دخول مسؤولي النظام (بوابة الإدارة المستقلة #admin)</span>
+                </button>
+              </div>
+            )}
           </div>
       </div>
 

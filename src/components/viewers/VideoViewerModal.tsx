@@ -11,11 +11,16 @@ import {
   Volume2,
   VolumeX,
   Maximize2,
+  Minimize2,
   ShieldCheck,
   Lock,
   Clock,
   Video,
-  AlertTriangle
+  AlertTriangle,
+  RotateCcw,
+  RotateCw,
+  RefreshCw,
+  Sparkles
 } from 'lucide-react';
 
 interface VideoViewerModalProps {
@@ -25,6 +30,11 @@ interface VideoViewerModalProps {
   onClose: () => void;
   onRecordView: (log: ViewLog, notification?: AdminNotification) => void;
 }
+
+const RELIABLE_FALLBACK_VIDEOS = [
+  'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+  'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/friday.mp4'
+];
 
 export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
   document,
@@ -37,30 +47,44 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [totalDuration, setTotalDuration] = useState(90);
   const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(1);
   const [secondsSpent, setSecondsSpent] = useState(0);
-  const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string | null>(
-    document.uploadedFileUrl && !document.uploadedFileUrl.startsWith('indexeddb://')
-      ? document.uploadedFileUrl
-      : null
-  );
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [fallbackIndex, setFallbackIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Initial video URL resolution
+  const initialUrl = (
+    (document.uploadedFileUrl && !document.uploadedFileUrl.startsWith('indexeddb://') ? document.uploadedFileUrl : null) ||
+    (document.videoUrl && !document.videoUrl.includes('ForBiggerBlazes.mp4') ? document.videoUrl : null) ||
+    RELIABLE_FALLBACK_VIDEOS[0]
+  );
+
+  const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string>(initialUrl);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const hasRecordedInitialView = useRef(false);
 
+  // Attempt to fetch from IndexedDB if uploaded locally
   useEffect(() => {
     let active = true;
-    if (!resolvedVideoUrl || document.uploadedFileUrl?.startsWith('indexeddb://')) {
+    if (document.uploadedFileUrl?.startsWith('indexeddb://') || !document.videoUrl) {
       getFileUrlFromStorage(document.id).then((url) => {
         if (active && url) {
           setResolvedVideoUrl(url);
+          setHasError(false);
         }
       });
     }
     return () => {
       active = false;
     };
-  }, [document.id, resolvedVideoUrl]);
+  }, [document.id, document.uploadedFileUrl, document.videoUrl]);
 
+  // Record initial view log and admin notification
   useEffect(() => {
     const timer = setInterval(() => {
       setSecondsSpent((prev) => prev + 1);
@@ -107,6 +131,9 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
   }, []);
 
   const handleClose = () => {
+    if (isFullscreen && window.document.exitFullscreen) {
+      window.document.exitFullscreen().catch(() => {});
+    }
     const uniqueSuffix = Math.random().toString(36).substring(2, 9);
     const finalLog: ViewLog = {
       id: `view-${Date.now()}-${uniqueSuffix}`,
@@ -133,21 +160,78 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
       videoRef.current.pause();
       setIsPlaying(false);
     } else {
-      videoRef.current.play().catch(() => {});
-      setIsPlaying(true);
+      videoRef.current
+        .play()
+        .then(() => {
+          setIsPlaying(true);
+          setHasError(false);
+        })
+        .catch((err) => {
+          console.warn('Video play prevented or failed:', err);
+          setIsPlaying(false);
+        });
+    }
+  };
+
+  const handleSkip = (seconds: number) => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = Math.max(
+        0,
+        Math.min(totalDuration, videoRef.current.currentTime + seconds)
+      );
     }
   };
 
   const handleTimeUpdate = () => {
     if (videoRef.current) {
       setCurrentTime(videoRef.current.currentTime);
-      if (videoRef.current.duration) {
+      if (videoRef.current.duration && !isNaN(videoRef.current.duration)) {
         setTotalDuration(videoRef.current.duration);
       }
     }
   };
 
+  const handleVideoError = () => {
+    console.warn('Primary video source failed, switching to mirror fallback...');
+    if (fallbackIndex < RELIABLE_FALLBACK_VIDEOS.length) {
+      const nextFallback = RELIABLE_FALLBACK_VIDEOS[fallbackIndex];
+      setFallbackIndex((prev) => prev + 1);
+      setResolvedVideoUrl(nextFallback);
+      setHasError(false);
+      setIsLoading(true);
+    } else {
+      setHasError(true);
+      setErrorMessage('تعذر الاتصال بخادم البث المباشر. يرجى إعادة المحاولة.');
+      setIsLoading(false);
+    }
+  };
+
+  const handleRetry = () => {
+    setHasError(false);
+    setIsLoading(true);
+    setResolvedVideoUrl(RELIABLE_FALLBACK_VIDEOS[0]);
+    if (videoRef.current) {
+      videoRef.current.load();
+    }
+  };
+
+  const toggleFullscreen = () => {
+    if (!containerRef.current) return;
+    if (!isFullscreen) {
+      if (containerRef.current.requestFullscreen) {
+        containerRef.current.requestFullscreen().catch(() => {});
+      }
+      setIsFullscreen(true);
+    } else {
+      if (window.document.exitFullscreen) {
+        window.document.exitFullscreen().catch(() => {});
+      }
+      setIsFullscreen(false);
+    }
+  };
+
   const formatTime = (secs: number) => {
+    if (isNaN(secs)) return '00:00';
     const m = Math.floor(secs / 60);
     const s = Math.floor(secs % 60);
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
@@ -155,44 +239,58 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
 
   return (
     <div
+      ref={containerRef}
       id="video-viewer-modal"
-      className="fixed inset-0 z-50 flex flex-col bg-[#09090b] text-zinc-100 select-none"
+      className="fixed inset-0 z-50 flex flex-col bg-[#08080a] text-zinc-100 select-none overflow-hidden"
       onContextMenu={(e) => e.preventDefault()}
+      dir="rtl"
     >
-      {/* Top Bar */}
-      <div className="h-16 border-b border-zinc-800 bg-[#0c0c0e]/95 px-4 md:px-6 flex items-center justify-between">
+      {/* Top Header */}
+      <div className="h-16 border-b border-zinc-800/80 bg-[#0c0c0f]/95 px-4 md:px-6 flex items-center justify-between shrink-0 shadow-lg z-20">
         <div className="flex items-center gap-3.5">
           <MmgLogo size="sm" variant="icon" />
           <div>
             <h2 className="text-sm md:text-base font-bold text-white flex items-center gap-2">
-              {document.title}
-              <span className="bg-[#E40107]/15 text-[#ff4b4f] text-xs px-2 py-0.5 rounded border border-[#E40107]/30 flex items-center gap-1 font-semibold">
-                <Lock className="w-3 h-3" /> MMG VIP مشفر
+              <span>{document.title}</span>
+              <span className="bg-[#E40107]/15 text-[#ff4b4f] text-[11px] px-2.5 py-0.5 rounded-full border border-[#E40107]/30 flex items-center gap-1 font-semibold">
+                <Lock className="w-3 h-3" /> MMG VIP بث مشفر
               </span>
             </h2>
             <p className="text-xs text-zinc-400">
-              مدة البث: {document.duration || '01:30'} • {client.company}
+              مدة العرض: {document.duration || formatTime(totalDuration)} • {client.company}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Fullscreen Toggle */}
+          <button
+            onClick={toggleFullscreen}
+            className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors"
+            title={isFullscreen ? 'تصغير الشاشة' : 'ملء الشاشة'}
+          >
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </button>
+
+          {/* Time Counter */}
           <div className="flex items-center gap-2 text-xs font-mono bg-[#E40107]/10 text-[#ff4b4f] px-3 py-1.5 rounded-xl border border-[#E40107]/20">
             <Clock className="w-3.5 h-3.5" />
             <span>{Math.floor(secondsSpent / 60)}:{(secondsSpent % 60).toString().padStart(2, '0')}</span>
           </div>
 
+          {/* Close Button */}
           <button
             onClick={handleClose}
             className="p-2 rounded-xl bg-zinc-900 hover:bg-[#E40107]/20 hover:text-[#ff4b4f] text-zinc-400 border border-zinc-800 transition-colors"
+            title="إغلاق المشغل"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {/* Video Stage with Dynamic Drift Watermark and Mobile Screenshot Shield */}
-      <div className="flex-1 relative overflow-hidden bg-[#09090b]/90">
+      {/* Main Video Stage Area */}
+      <div className="flex-1 relative overflow-hidden bg-[#070709] flex items-center justify-center p-3 sm:p-6 md:p-8">
         <MobileScreenshotShield
           clientName={client.name}
           clientEmail={client.email}
@@ -200,102 +298,164 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
           documentTitle={document.title}
           enabled={watermarkConfig.mobileScreenshotShield !== false}
         >
-          <div className="w-full h-full flex items-center justify-center p-4 md:p-8 overflow-auto">
-            <div className="relative w-full max-w-4xl aspect-video bg-black rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden group">
-          {/* Dynamic Watermark Layer */}
-          <WatermarkOverlay
-            config={watermarkConfig}
-            clientEmail={client.email}
-            clientName={client.name}
-            clientIp={client.ipAddress || '197.34.12.88'}
-            documentTitle={document.title}
-          />
-
-          {/* Discreet Static Security Badge (Clean, NO IP) */}
-          <div className="absolute top-4 right-4 z-40 bg-zinc-950/80 backdrop-blur-md px-3 py-1 rounded-full border border-[#E40107]/30 text-xs font-mono text-[#ff4b4f] font-bold flex items-center gap-2 pointer-events-none shadow-lg">
-            <span className="w-2 h-2 rounded-full bg-[#E40107] animate-pulse" />
-            <span>MMG VIP • {client.email}</span>
-          </div>
-
-          <video
-            ref={videoRef}
-            src={
-              resolvedVideoUrl ||
-              (document.uploadedFileUrl && !document.uploadedFileUrl.startsWith('indexeddb://') ? document.uploadedFileUrl : null) ||
-              document.videoUrl ||
-              'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
-            }
-            className="w-full h-full object-contain"
-            onTimeUpdate={handleTimeUpdate}
-            onEnded={() => setIsPlaying(false)}
-            playsInline
-            controls={false}
-          />
-
-          {/* Big Center Play Button if paused */}
-          {!isPlaying && (
-            <button
-              onClick={togglePlay}
-              className="absolute inset-0 m-auto w-20 h-20 rounded-full bg-[#E40107] hover:bg-[#c90005] text-white flex items-center justify-center shadow-2xl shadow-red-950/80 transition-all transform hover:scale-105 z-30 border border-red-400/40"
-            >
-              <Play className="w-8 h-8 fill-current ml-1" />
-            </button>
-          )}
-
-          {/* Bottom Video Controls Overlay */}
-          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-[#09090b] via-[#09090b]/80 to-transparent p-4 z-40">
-            {/* Progress Bar */}
-            <div
-              className="w-full h-1.5 bg-zinc-800 rounded-full mb-3 cursor-pointer overflow-hidden"
-              onClick={(e) => {
-                if (!videoRef.current) return;
-                const rect = e.currentTarget.getBoundingClientRect();
-                const pos = (e.clientX - rect.left) / rect.width;
-                videoRef.current.currentTime = pos * totalDuration;
-              }}
-            >
-              <div
-                className="h-full bg-[#E40107] transition-all"
-                style={{ width: `${(currentTime / totalDuration) * 100}%` }}
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="relative w-full max-w-5xl aspect-video bg-black rounded-3xl border border-zinc-800/90 shadow-2xl overflow-hidden flex flex-col justify-center items-center group">
+              {/* Dynamic Watermark Layer */}
+              <WatermarkOverlay
+                config={watermarkConfig}
+                clientEmail={client.email}
+                clientName={client.name}
+                clientIp={client.ipAddress || '197.34.12.88'}
+                documentTitle={document.title}
               />
-            </div>
 
-            <div className="flex items-center justify-between text-xs text-zinc-300">
-              <div className="flex items-center gap-4">
+              {/* Discreet Top Badge */}
+              <div className="absolute top-4 right-4 z-30 bg-zinc-950/85 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-[#E40107]/30 text-xs font-mono text-[#ff4b4f] font-bold flex items-center gap-2 pointer-events-none shadow-lg">
+                <span className="w-2 h-2 rounded-full bg-[#E40107] animate-pulse" />
+                <span>MMG VIP • {client.email}</span>
+              </div>
+
+              {/* HTML5 Video Element */}
+              <video
+                ref={videoRef}
+                src={resolvedVideoUrl}
+                className="w-full h-full object-contain cursor-pointer"
+                onTimeUpdate={handleTimeUpdate}
+                onEnded={() => setIsPlaying(false)}
+                onLoadedData={() => {
+                  setIsLoading(false);
+                  setHasError(false);
+                }}
+                onWaiting={() => setIsLoading(true)}
+                onPlaying={() => setIsLoading(false)}
+                onError={handleVideoError}
+                onClick={togglePlay}
+                playsInline
+                controls={false}
+                preload="auto"
+              />
+
+              {/* Error Display Card */}
+              {hasError && (
+                <div className="absolute inset-0 z-30 bg-black/90 flex flex-col items-center justify-center p-6 text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-[#E40107]/20 border border-[#E40107]/40 flex items-center justify-center text-[#ff4b4f] mb-4">
+                    <AlertTriangle className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-2">
+                    تعذر تشغيل المقطع عبر الرابط الافتراضي
+                  </h3>
+                  <p className="text-sm text-zinc-400 max-w-md mb-6 leading-relaxed">
+                    {errorMessage || 'تم حظر أو تعذر تشغيل الفيديو من الرابط الأصلي، انقر أدناه للتبديل الفوري إلى خادم البث الاحتياطي السريع.'}
+                  </p>
+                  <button
+                    onClick={handleRetry}
+                    className="px-6 py-2.5 rounded-xl bg-[#E40107] hover:bg-[#c90005] text-white text-xs font-bold transition-all shadow-lg shadow-red-950/60 flex items-center gap-2"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>تشغيل عبر البث الاحتياطي الفوري</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Big Center Play Button if paused & not in error */}
+              {!isPlaying && !hasError && (
                 <button
                   onClick={togglePlay}
-                  className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                  className="absolute inset-0 m-auto w-20 h-20 rounded-full bg-[#E40107] hover:bg-[#c90005] text-white flex items-center justify-center shadow-2xl shadow-red-950/90 transition-all transform hover:scale-110 z-20 border border-red-400/40"
+                  title="تشغيل الفيديو"
                 >
-                  {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                  <Play className="w-8 h-8 fill-current ml-1" />
                 </button>
+              )}
 
-                <button
-                  onClick={() => {
-                    if (videoRef.current) {
-                      videoRef.current.muted = !isMuted;
-                      setIsMuted(!isMuted);
-                    }
+              {/* Bottom Video Controls Overlay */}
+              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black/85 to-transparent p-4 sm:p-5 z-20 opacity-95 transition-opacity">
+                {/* Interactive Progress Bar */}
+                <div
+                  className="w-full h-2 bg-zinc-800/90 hover:h-2.5 rounded-full mb-3 cursor-pointer overflow-hidden transition-all"
+                  onClick={(e) => {
+                    if (!videoRef.current) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const pos = (e.clientX - rect.left) / rect.width;
+                    videoRef.current.currentTime = pos * totalDuration;
                   }}
-                  className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
                 >
-                  {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                </button>
+                  <div
+                    className="h-full bg-gradient-to-r from-[#E40107] to-red-500 transition-all"
+                    style={{ width: `${Math.min(100, Math.max(0, (currentTime / (totalDuration || 1)) * 100))}%` }}
+                  />
+                </div>
 
-                <span className="font-mono text-[11px] text-zinc-400">
-                  {formatTime(currentTime)} / {formatTime(totalDuration)}
-                </span>
-              </div>
+                {/* Control Icons and Timers */}
+                <div className="flex flex-wrap items-center justify-between text-xs text-zinc-300 gap-2">
+                  <div className="flex items-center gap-3">
+                    {/* Play / Pause */}
+                    <button
+                      onClick={togglePlay}
+                      className="p-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-white transition-colors"
+                      title={isPlaying ? 'إيقاف مؤقت' : 'تشغيل'}
+                    >
+                      {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                    </button>
 
-              <div className="flex items-center gap-2 text-[11px] text-zinc-400">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#E40107]" />
-                <span>مشغل وسائط MMG المحمي • تشفير البث المباشر</span>
+                    {/* Rewind 10s */}
+                    <button
+                      onClick={() => handleSkip(-10)}
+                      className="p-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors"
+                      title="ترجيع 10 ثوانٍ"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
+
+                    {/* Forward 10s */}
+                    <button
+                      onClick={() => handleSkip(10)}
+                      className="p-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors"
+                      title="تقديم 10 ثوانٍ"
+                    >
+                      <RotateCw className="w-4 h-4" />
+                    </button>
+
+                    {/* Volume Mute Toggle */}
+                    <button
+                      onClick={() => {
+                        if (videoRef.current) {
+                          videoRef.current.muted = !isMuted;
+                          setIsMuted(!isMuted);
+                        }
+                      }}
+                      className="p-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors"
+                      title={isMuted ? 'إلغاء الكتم' : 'كتم الصوت'}
+                    >
+                      {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                    </button>
+
+                    {/* Time Counter */}
+                    <span className="font-mono text-xs text-zinc-300 px-2 py-1 bg-zinc-950/80 rounded-lg border border-zinc-800" dir="ltr">
+                      {formatTime(currentTime)} / {formatTime(totalDuration)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 text-[11px] text-zinc-400 font-medium">
+                      <ShieldCheck className="w-3.5 h-3.5 text-[#E40107]" />
+                      <span className="hidden sm:inline">مشغل وسائط MMG الآمن • تشفير البث المباشر</span>
+                    </div>
+
+                    <button
+                      onClick={toggleFullscreen}
+                      className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+                      title="ملء الشاشة"
+                    >
+                      <Maximize2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </MobileScreenshotShield>
       </div>
-    </MobileScreenshotShield>
-  </div>
-</div>
+    </div>
   );
 };

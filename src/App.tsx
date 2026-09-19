@@ -43,11 +43,13 @@ import {
 } from './lib/firebase';
 import { Navbar } from './components/Navbar';
 import { ClientLogin } from './components/client/ClientLogin';
+import { AdminLogin } from './components/admin/AdminLogin';
 import { ClientPortal } from './components/client/ClientPortal';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { PdfViewerModal } from './components/viewers/PdfViewerModal';
 import { PresentationViewerModal } from './components/viewers/PresentationViewerModal';
 import { VideoViewerModal } from './components/viewers/VideoViewerModal';
+import { GlobalSecurityShield } from './components/GlobalSecurityShield';
 
 export default function App() {
   // Application Data States
@@ -110,6 +112,35 @@ export default function App() {
   const [activePdfDoc, setActivePdfDoc] = useState<DocumentItem | null>(null);
   const [activePresentationDoc, setActivePresentationDoc] = useState<DocumentItem | null>(null);
   const [activeVideoDoc, setActiveVideoDoc] = useState<DocumentItem | null>(null);
+
+  // Independent Route for Auth: 'client' or 'admin' (e.g. #admin or URL param ?mode=admin)
+  const [authRoute, setAuthRoute] = useState<'client' | 'admin'>(() => {
+    try {
+      const hash = window.location.hash.toLowerCase();
+      const params = new URLSearchParams(window.location.search);
+      if (hash.includes('admin') || params.get('mode') === 'admin' || params.get('tab') === 'admin') {
+        return 'admin';
+      }
+    } catch {
+      // ignore
+    }
+    return 'client';
+  });
+
+  // Listen to hash changes (e.g. #admin vs #client)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.toLowerCase();
+      const params = new URLSearchParams(window.location.search);
+      if (hash.includes('admin') || params.get('mode') === 'admin' || params.get('tab') === 'admin') {
+        setAuthRoute('admin');
+      } else {
+        setAuthRoute('client');
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Sync with LocalStorage
   useEffect(() => {
@@ -487,15 +518,35 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 flex flex-col font-sans selection:bg-[#E40107]/30 selection:text-[#ff4b4f]">
+      {/* Global Anti-Screenshot, Anti-Copy, Anti-Paste & DRM Protection Shield */}
+      <GlobalSecurityShield enabled={true} />
+
       {!isAuthenticated ? (
-        <ClientLogin
-          clients={clients}
-          onLoginSuccess={handleClientLoginSuccess}
-          onAdminLogin={handleAdminLogin}
-          onRecordLogin={handleRecordLogin}
-          sessionExpiredReason={sessionExpiredNotice}
-          onClearSessionNotice={() => setSessionExpiredNotice(null)}
-        />
+        authRoute === 'admin' ? (
+          <AdminLogin
+            onAdminLogin={handleAdminLogin}
+            onRecordLogin={handleRecordLogin}
+            sessionExpiredReason={sessionExpiredNotice}
+            onClearSessionNotice={() => setSessionExpiredNotice(null)}
+            onGoToClientLogin={() => {
+              window.location.hash = '';
+              setAuthRoute('client');
+            }}
+          />
+        ) : (
+          <ClientLogin
+            clients={clients}
+            onLoginSuccess={handleClientLoginSuccess}
+            onAdminLogin={handleAdminLogin}
+            onRecordLogin={handleRecordLogin}
+            sessionExpiredReason={sessionExpiredNotice}
+            onClearSessionNotice={() => setSessionExpiredNotice(null)}
+            onGoToAdminLogin={() => {
+              window.location.hash = '#admin';
+              setAuthRoute('admin');
+            }}
+          />
+        )
       ) : (
         <>
           <Navbar

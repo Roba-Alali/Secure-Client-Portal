@@ -228,7 +228,7 @@ export const initialDocuments: DocumentItem[] = [
     watermarkEnabled: true,
     downloadRestricted: true,
     viewsCount: 19,
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+    videoUrl: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
   },
   {
     id: 'doc-5',
@@ -419,7 +419,7 @@ export const initialDocuments: DocumentItem[] = [
     watermarkEnabled: true,
     downloadRestricted: true,
     viewsCount: 31,
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+    videoUrl: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/friday.mp4'
   }
 ];
 

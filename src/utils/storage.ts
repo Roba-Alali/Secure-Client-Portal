@@ -67,7 +67,22 @@ export const saveStoredProjects = (projects: Project[]) => {
 export const getStoredDocuments = (): DocumentItem[] => {
   try {
     const saved = localStorage.getItem(STORAGE_KEYS.DOCUMENTS);
-    return saved ? deduplicateById<DocumentItem>(JSON.parse(saved)) : initialDocuments;
+    const docs = saved ? deduplicateById<DocumentItem>(JSON.parse(saved)) : initialDocuments;
+    return docs.map((d) => {
+      if (
+        d.fileType === 'video' &&
+        (!d.videoUrl || d.videoUrl.includes('ForBiggerBlazes.mp4') || d.videoUrl.includes('gtv-videos-bucket'))
+      ) {
+        return {
+          ...d,
+          videoUrl:
+            d.id === 'doc-4'
+              ? 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
+              : 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/friday.mp4'
+        };
+      }
+      return d;
+    });
   } catch {
     return initialDocuments;
   }
