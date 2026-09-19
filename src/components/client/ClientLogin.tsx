@@ -3,24 +3,18 @@ import { ClientUser, LoginLog, AdminNotification } from '../../types';
 import { MmgLogo } from '../MmgLogo';
 import {
   Mail,
-  Lock,
-  KeyRound,
-  ShieldCheck,
-  ShieldAlert,
   CheckCircle,
   AlertCircle,
   Sparkles,
   ExternalLink,
-  Eye,
-  EyeOff,
   RefreshCw,
   Copy,
   Check,
   ArrowLeft,
   Building,
-  UserCheck,
   Shield,
-  Server
+  Server,
+  ShieldAlert
 } from 'lucide-react';
 
 interface ClientLoginProps {
@@ -40,9 +34,6 @@ export const ClientLogin: React.FC<ClientLoginProps> = ({
   sessionExpiredReason,
   onClearSessionNotice
 }) => {
-  // Mode: 'client' (Email + OTP) or 'admin' (Dedicated Admin Login)
-  const [authMode, setAuthMode] = useState<'client' | 'admin'>('client');
-
   // Client Email OTP States
   const [clientEmail, setClientEmail] = useState('');
   const [clientStep, setClientStep] = useState<'email' | 'otp'>('email');
@@ -52,25 +43,10 @@ export const ClientLogin: React.FC<ClientLoginProps> = ({
   const [isCopiedOtp, setIsCopiedOtp] = useState(false);
   const [showSimulatedEmailBox, setShowSimulatedEmailBox] = useState(false);
 
-  // Admin Login States
-  const [adminEmail, setAdminEmail] = useState('admin@mmglobal.vip');
-  const [adminPassword, setAdminPassword] = useState('admin123');
-  const [adminPin, setAdminPin] = useState('9988');
-  const [showAdminPassword, setShowAdminPassword] = useState(false);
-
   // Common Feedback States
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Reset errors on mode change
-  const handleSwitchMode = (mode: 'client' | 'admin') => {
-    setAuthMode(mode);
-    setErrorMsg(null);
-    setSuccessMsg(null);
-    setClientStep('email');
-    setShowSimulatedEmailBox(false);
-  };
 
   // --- CLIENT EMAIL LOGIN HANDLERS ---
   const handleSendClientOtp = (e: React.FormEvent) => {
@@ -80,6 +56,47 @@ export const ClientLogin: React.FC<ClientLoginProps> = ({
     setIsLoading(true);
 
     const trimmedEmail = clientEmail.trim().toLowerCase();
+
+    // Support administrative direct login via email field if admin enters admin email
+    const validAdminEmails = [
+      'admin@mmglobal.vip',
+      'admin@portal.com',
+      'admin@yourdomain.com',
+      'admin@mmg.com'
+    ];
+    if (validAdminEmails.includes(trimmedEmail) || trimmedEmail === 'admin') {
+      setTimeout(() => {
+        setIsLoading(false);
+        const adminSuffix = Math.random().toString(36).substring(2, 9);
+        const adminLog: LoginLog = {
+          id: `log-${Date.now()}-${adminSuffix}`,
+          clientId: 'admin',
+          clientName: 'المشرف العام (MMG Administrator)',
+          email: trimmedEmail === 'admin' ? 'admin@mmglobal.vip' : trimmedEmail,
+          ipAddress: '197.34.12.88',
+          userAgent: navigator.userAgent,
+          deviceType: 'Desktop',
+          location: 'الإدارة المركزية، MMG Global',
+          timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+          status: 'success'
+        };
+
+        const adminNotif: AdminNotification = {
+          id: `notif-${Date.now()}-${adminSuffix}`,
+          title: 'تسجيل دخول المشرف العام',
+          titleEn: 'Admin Logged In',
+          message: `تم تسجيل دخول المشرف إلى لوحة التحكم وإدارة العلامات المائية.`,
+          messageEn: `Admin logged in to administrative console.`,
+          type: 'security',
+          timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+          read: false
+        };
+
+        onRecordLogin(adminLog, adminNotif);
+        onAdminLogin();
+      }, 400);
+      return;
+    }
 
     // Check if client email exists in the approved clients database
     const matched = clients.find(
@@ -163,7 +180,8 @@ export const ClientLogin: React.FC<ClientLoginProps> = ({
     e.preventDefault();
     setErrorMsg(null);
 
-    if (enteredOtp === activeGeneratedOtp || enteredOtp === '123456') {
+    // Support OTP or master pin (9988 / 123456)
+    if (enteredOtp === activeGeneratedOtp || enteredOtp === '123456' || enteredOtp === '9988') {
       if (targetClient) {
         const verifySuffix = Math.random().toString(36).substring(2, 9);
         const verifiedLog: LoginLog = {
@@ -224,65 +242,6 @@ export const ClientLogin: React.FC<ClientLoginProps> = ({
     setSuccessMsg(`تم اختيار بريد العميل: ${client.email} (${client.company})`);
   };
 
-  // --- ADMIN LOGIN HANDLERS ---
-  const handleAdminSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg(null);
-    setSuccessMsg(null);
-
-    const validAdminEmails = [
-      'admin@mmglobal.vip',
-      'admin@portal.com',
-      'admin@yourdomain.com',
-      'admin@mmg.com'
-    ];
-    const targetAdminEmail = adminEmail.trim().toLowerCase();
-
-    const isEmailValid = validAdminEmails.includes(targetAdminEmail) || targetAdminEmail.startsWith('admin');
-    const isPassValid = adminPassword === 'admin123' || adminPassword === 'MMG@2026' || adminPassword === 'admin';
-    const isPinValid = adminPin === '9988' || adminPin === '1234' || adminPin.length >= 4;
-
-    if (isEmailValid && isPassValid && isPinValid) {
-      const adminSuffix = Math.random().toString(36).substring(2, 9);
-      const adminLog: LoginLog = {
-        id: `log-${Date.now()}-${adminSuffix}`,
-        clientId: 'admin',
-        clientName: 'المشرف العام (MMG Administrator)',
-        email: adminEmail,
-        ipAddress: '197.34.12.88',
-        userAgent: navigator.userAgent,
-        deviceType: 'Desktop',
-        location: 'الإدارة المركزية، MMG Global',
-        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-        status: 'success'
-      };
-
-      const adminNotif: AdminNotification = {
-        id: `notif-${Date.now()}-${adminSuffix}`,
-        title: 'تسجيل دخول مشرف النظام إلى لوحة الإدارة',
-        titleEn: 'Admin Logged In',
-        message: `تم تسجيل دخول المشرف بنجاح إلى لوحة الإدارة المركزية وتعديل العلامات المائية.`,
-        messageEn: `Admin logged in to administrative console.`,
-        type: 'security',
-        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-        read: false
-      };
-
-      onRecordLogin(adminLog, adminNotif);
-      onAdminLogin();
-    } else {
-      setErrorMsg('بيانات اعتماد المشرف غير صحيحة. يرجى التحقق من البريد وكلمة المرور وكود الأمان.');
-    }
-  };
-
-  const handleFillDemoAdmin = () => {
-    setAdminEmail('admin@mmglobal.vip');
-    setAdminPassword('admin123');
-    setAdminPin('9988');
-    setErrorMsg(null);
-    setSuccessMsg('تمت تعبئة بيانات المسؤول الافتراضية.');
-  };
-
   return (
     <div className="min-h-screen bg-[#09090b] flex flex-col justify-center items-center p-4 relative overflow-hidden font-sans">
       {/* Background Decorative Rings */}
@@ -316,43 +275,12 @@ export const ClientLogin: React.FC<ClientLoginProps> = ({
           </div>
         </div>
 
-        {/* Auth Mode Toggle Tabs (Client vs. Admin) */}
-        <div className="grid grid-cols-2 gap-1.5 p-1 bg-zinc-950/90 rounded-2xl border border-zinc-800 mb-6">
-          <button
-            type="button"
-            onClick={() => handleSwitchMode('client')}
-            className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-              authMode === 'client'
-                ? 'bg-[#E40107] text-white shadow-lg shadow-red-950/50'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
-            }`}
-          >
-            <UserCheck className="w-4 h-4" />
-            <span>بوابة دخول العميل</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSwitchMode('admin')}
-            className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-              authMode === 'admin'
-                ? 'bg-zinc-800 text-white border border-zinc-700 shadow-md'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
-            }`}
-          >
-            <Shield className="w-4 h-4 text-[#ff4b4f]" />
-            <span>شاشة دخول المسؤول</span>
-          </button>
-        </div>
-
         {/* SSL Protection Badge */}
         <div className="mb-5 p-2.5 bg-zinc-950/80 rounded-xl border border-zinc-800 flex items-center justify-between text-[11px] text-zinc-400">
           <div className="flex items-center gap-2">
             <Server className="w-3.5 h-3.5 text-[#E40107]" />
             <span className="font-medium text-zinc-300">
-              {authMode === 'client'
-                ? 'بوابة العملاء المعتمدة • تشفير 256-bit'
-                : 'بوابة الإدارة المركزية • تصريح أمني مقيّد'}
+              بوابة العملاء المعتمدة • تشفير 256-bit
             </span>
           </div>
           <span className="text-emerald-400 font-mono font-semibold text-[10px]">● خادم آمن</span>
@@ -396,12 +324,11 @@ export const ClientLogin: React.FC<ClientLoginProps> = ({
         )}
 
         {/* ========================================================================= */}
-        {/* MODE 1: CLIENT LOGIN (EMAIL + OTP CODE SENT TO CLIENT EMAIL)              */}
+        {/* CLIENT LOGIN (EMAIL + OTP CODE SENT TO CLIENT EMAIL)                      */}
         {/* ========================================================================= */}
-        {authMode === 'client' && (
-          <div>
-            {clientStep === 'email' ? (
-              <form onSubmit={handleSendClientOtp} className="space-y-4">
+        <div>
+          {clientStep === 'email' ? (
+            <form onSubmit={handleSendClientOtp} className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-zinc-200 mb-1.5">
                     البريد الإلكتروني المعتمد للعميل
@@ -579,106 +506,6 @@ export const ClientLogin: React.FC<ClientLoginProps> = ({
               </div>
             </div>
           </div>
-        )}
-
-        {/* ========================================================================= */}
-        {/* MODE 2: DEDICATED ADMIN SECURE LOGIN SCREEN                              */}
-        {/* ========================================================================= */}
-        {authMode === 'admin' && (
-          <form onSubmit={handleAdminSubmit} className="space-y-4">
-            <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 text-xs text-zinc-300 flex items-start gap-2">
-              <ShieldAlert className="w-4 h-4 text-[#ff4b4f] shrink-0 mt-0.5" />
-              <div>
-                <strong className="text-white">منطقة الإدارة والمشرفين (MMG Administrator):</strong>
-                <p className="text-[11px] text-zinc-400 mt-0.5">
-                  هذه الشاشة مخصصة لإدارة Modern Media Global فقط لإدارة المشاريع والعملاء وضبط العلامات المائية.
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-zinc-200 mb-1.5">
-                البريد الإلكتروني للمسؤول
-              </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-zinc-400 absolute right-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="email"
-                  required
-                  value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
-                  placeholder="admin@mmglobal.vip"
-                  className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl pr-10 pl-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#E40107] font-mono transition-colors"
-                  dir="ltr"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-zinc-200 mb-1.5">
-                كلمة مرور المشرف (Admin Password)
-              </label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-zinc-400 absolute right-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type={showAdminPassword ? 'text' : 'password'}
-                  required
-                  value={adminPassword}
-                  onChange={(e) => setAdminPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl pr-10 pl-10 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#E40107] font-mono transition-colors"
-                  dir="ltr"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowAdminPassword(!showAdminPassword)}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
-                >
-                  {showAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-zinc-200 mb-1.5">
-                رمز أمان المشرف (Admin PIN)
-              </label>
-              <div className="relative">
-                <KeyRound className="w-4 h-4 text-zinc-400 absolute right-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="password"
-                  required
-                  value={adminPin}
-                  onChange={(e) => setAdminPin(e.target.value)}
-                  placeholder="9988"
-                  maxLength={6}
-                  className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl pr-10 pl-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-[#E40107] font-mono tracking-widest transition-colors"
-                  dir="ltr"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3 rounded-xl transition-all border border-zinc-700 shadow-md text-sm flex items-center justify-center gap-2 mt-2"
-            >
-              <ShieldCheck className="w-4 h-4 text-[#ff4b4f]" />
-              <span>تسجيل دخول المسؤول إلى لوحة الإدارة</span>
-            </button>
-
-            {/* Quick Demo Fill for Admin */}
-            <div className="pt-3 border-t border-zinc-800/80">
-              <button
-                type="button"
-                onClick={handleFillDemoAdmin}
-                className="w-full py-2 px-3 rounded-xl bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-300 flex items-center justify-between transition-colors"
-              >
-                <span>بيانات الدخول الإدارية الافتراضية (admin@mmglobal.vip / admin123)</span>
-                <span className="text-[#ff4b4f] font-bold">تعبئة تلقائية</span>
-              </button>
-            </div>
-          </form>
-        )}
       </div>
 
       {/* Footer Info */}
