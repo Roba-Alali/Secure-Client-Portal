@@ -82,6 +82,9 @@ export interface WatermarkConfig {
   multiTouchGestureShield: boolean;
   dynamicFloatingPill: boolean;
   antiCropCornerStamps: boolean;
+  // Session Security & Auto-Termination
+  autoTerminateOnExit: boolean;
+  sessionTimeoutMinutes: number;
 }
 
 export interface LoginLog {

@@ -60,15 +60,31 @@ export default function App() {
   const [notifications, setNotifications] = useState<AdminNotification[]>(() => getStoredNotifications());
 
   // Auth & Session States
+  // Use sessionStorage as primary session carrier so closing the browser/tab strictly terminates session
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('mmg_session_auth') === 'true';
+    const isSessionAuth = sessionStorage.getItem('mmg_session_auth') === 'true';
+    if (isSessionAuth) return true;
+    // Check if autoTerminateOnExit was disabled in watermark config; otherwise, terminate
+    const savedWm = getStoredWatermarkConfig();
+    if (savedWm.autoTerminateOnExit === false) {
+      return localStorage.getItem('mmg_session_auth') === 'true';
+    }
+    // Clean up persistent local storage if auto-termination is active
+    localStorage.removeItem('mmg_session_auth');
+    localStorage.removeItem('mmg_session_role');
+    localStorage.removeItem('mmg_session_client_id');
+    return false;
   });
+
   const [currentRole, setCurrentRole] = useState<UserRole>(() => {
+    const sessionRole = sessionStorage.getItem('mmg_session_role') as UserRole;
+    if (sessionRole) return sessionRole;
     return (localStorage.getItem('mmg_session_role') as UserRole) || 'client';
   });
+
   const [currentClient, setCurrentClient] = useState<ClientUser>(() => {
     try {
-      const savedClientId = localStorage.getItem('mmg_session_client_id');
+      const savedClientId = sessionStorage.getItem('mmg_session_client_id') || localStorage.getItem('mmg_session_client_id');
       const allClients = getStoredClients();
       if (savedClientId) {
         const found = allClients.find((c) => c.id === savedClientId);
@@ -78,6 +94,16 @@ export default function App() {
     } catch {
       return getStoredClients()[0];
     }
+  });
+
+  // Session Termination Banner notice
+  const [sessionExpiredNotice, setSessionExpiredNotice] = useState<string | null>(() => {
+    const pendingNotice = sessionStorage.getItem('mmg_session_expired_notice');
+    if (pendingNotice) {
+      sessionStorage.removeItem('mmg_session_expired_notice');
+      return pendingNotice;
+    }
+    return null;
   });
 
   // Active Viewers State
@@ -219,29 +245,120 @@ export default function App() {
     };
   }, []);
 
-  // Handlers
+  // Handlers & Session Termination Logic
+  const terminateSession = (reason?: string) => {
+    // Clear SessionStorage
+    sessionStorage.removeItem('mmg_session_auth');
+    sessionStorage.removeItem('mmg_session_role');
+    sessionStorage.removeItem('mmg_session_client_id');
+    sessionStorage.removeItem('mmg_session_last_active');
+
+    // Clear LocalStorage tokens
+    localStorage.removeItem('mmg_session_auth');
+    localStorage.removeItem('mmg_session_role');
+    localStorage.removeItem('mmg_session_client_id');
+
+    // Close any opened modal viewers
+    setActivePdfDoc(null);
+    setActivePresentationDoc(null);
+    setActiveVideoDoc(null);
+
+    setIsAuthenticated(false);
+    if (reason) {
+      setSessionExpiredNotice(reason);
+    }
+  };
+
   const handleClientLoginSuccess = (client: ClientUser) => {
-    localStorage.setItem('mmg_session_auth', 'true');
-    localStorage.setItem('mmg_session_role', 'client');
-    localStorage.setItem('mmg_session_client_id', client.id);
+    // Always store in sessionStorage for clean tab/browser close termination
+    sessionStorage.setItem('mmg_session_auth', 'true');
+    sessionStorage.setItem('mmg_session_role', 'client');
+    sessionStorage.setItem('mmg_session_client_id', client.id);
+    sessionStorage.setItem('mmg_session_last_active', Date.now().toString());
+
+    // Only store in localStorage if auto-termination is explicitly turned off
+    if (watermarkConfig.autoTerminateOnExit === false) {
+      localStorage.setItem('mmg_session_auth', 'true');
+      localStorage.setItem('mmg_session_role', 'client');
+      localStorage.setItem('mmg_session_client_id', client.id);
+    } else {
+      localStorage.removeItem('mmg_session_auth');
+      localStorage.removeItem('mmg_session_role');
+      localStorage.removeItem('mmg_session_client_id');
+    }
+
+    setSessionExpiredNotice(null);
     setCurrentClient(client);
     setCurrentRole('client');
     setIsAuthenticated(true);
   };
 
   const handleAdminLogin = () => {
-    localStorage.setItem('mmg_session_auth', 'true');
-    localStorage.setItem('mmg_session_role', 'admin');
+    sessionStorage.setItem('mmg_session_auth', 'true');
+    sessionStorage.setItem('mmg_session_role', 'admin');
+    sessionStorage.setItem('mmg_session_last_active', Date.now().toString());
+
+    if (watermarkConfig.autoTerminateOnExit === false) {
+      localStorage.setItem('mmg_session_auth', 'true');
+      localStorage.setItem('mmg_session_role', 'admin');
+    } else {
+      localStorage.removeItem('mmg_session_auth');
+      localStorage.removeItem('mmg_session_role');
+    }
+
+    setSessionExpiredNotice(null);
     setCurrentRole('admin');
     setIsAuthenticated(true);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('mmg_session_auth');
-    localStorage.removeItem('mmg_session_role');
-    localStorage.removeItem('mmg_session_client_id');
-    setIsAuthenticated(false);
+    terminateSession('تم تسجيل الخروج بنجاح وإنهاء الجلسة. يتطلب الدخول مجدداً التحقق من بياناتك.');
   };
+
+  // Activity & Window Exit / Inactivity Listeners
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    // 1. Inactivity tracking
+    const updateActivity = () => {
+      sessionStorage.setItem('mmg_session_last_active', Date.now().toString());
+    };
+
+    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
+    activityEvents.forEach((evt) => window.addEventListener(evt, updateActivity, { passive: true }));
+
+    // Check inactivity every 20 seconds
+    const timeoutMinutes = watermarkConfig.sessionTimeoutMinutes || 15;
+    const maxInactiveMs = timeoutMinutes * 60 * 1000;
+
+    const intervalId = setInterval(() => {
+      const lastActiveStr = sessionStorage.getItem('mmg_session_last_active');
+      if (lastActiveStr) {
+        const lastActive = parseInt(lastActiveStr, 10);
+        if (Date.now() - lastActive > maxInactiveMs) {
+          terminateSession(`تم إنهاء الجلسة تلقائياً بسبب عدم التفاعل لأكثر من ${timeoutMinutes} دقيقة. يرجى تسجيل الدخول مجدداً.`);
+        }
+      }
+    }, 20000);
+
+    // 2. Window Unload / Exit Protection
+    // When the user closes the tab or navigates away, clear persistent state if autoTerminateOnExit is enabled
+    const handleBeforeUnload = () => {
+      if (watermarkConfig.autoTerminateOnExit !== false) {
+        localStorage.removeItem('mmg_session_auth');
+        localStorage.removeItem('mmg_session_role');
+        localStorage.removeItem('mmg_session_client_id');
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      activityEvents.forEach((evt) => window.removeEventListener(evt, updateActivity));
+      clearInterval(intervalId);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isAuthenticated, watermarkConfig.sessionTimeoutMinutes, watermarkConfig.autoTerminateOnExit]);
 
   const handleRecordLogin = (log: LoginLog, notif?: AdminNotification) => {
     setLoginLogs((prev) => {
@@ -376,6 +493,8 @@ export default function App() {
           onLoginSuccess={handleClientLoginSuccess}
           onAdminLogin={handleAdminLogin}
           onRecordLogin={handleRecordLogin}
+          sessionExpiredReason={sessionExpiredNotice}
+          onClearSessionNotice={() => setSessionExpiredNotice(null)}
         />
       ) : (
         <>
@@ -396,6 +515,7 @@ export default function App() {
                 onOpenPdf={(doc) => setActivePdfDoc(doc)}
                 onOpenPresentation={(doc) => setActivePresentationDoc(doc)}
                 onOpenVideo={(doc) => setActiveVideoDoc(doc)}
+                onLogout={handleLogout}
               />
             ) : (
               <AdminDashboard

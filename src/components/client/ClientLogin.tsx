@@ -28,13 +28,17 @@ interface ClientLoginProps {
   onLoginSuccess: (client: ClientUser, is2Fa: boolean) => void;
   onAdminLogin: () => void;
   onRecordLogin: (log: LoginLog, notif?: AdminNotification) => void;
+  sessionExpiredReason?: string | null;
+  onClearSessionNotice?: () => void;
 }
 
 export const ClientLogin: React.FC<ClientLoginProps> = ({
   clients,
   onLoginSuccess,
   onAdminLogin,
-  onRecordLogin
+  onRecordLogin,
+  sessionExpiredReason,
+  onClearSessionNotice
 }) => {
   // Mode: 'client' (Email + OTP) or 'admin' (Dedicated Admin Login)
   const [authMode, setAuthMode] = useState<'client' | 'admin'>('client');
@@ -353,6 +357,28 @@ export const ClientLogin: React.FC<ClientLoginProps> = ({
           </div>
           <span className="text-emerald-400 font-mono font-semibold text-[10px]">● خادم آمن</span>
         </div>
+
+        {/* Session Termination Notice */}
+        {sessionExpiredReason && (
+          <div className="mb-4 p-3.5 bg-amber-500/15 border border-amber-500/40 rounded-2xl text-amber-200 text-xs flex items-start justify-between gap-2.5 leading-relaxed shadow-lg">
+            <div className="flex items-start gap-2.5">
+              <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-bold text-amber-300 mb-0.5">تم إنهاء الجلسة لأسباب أمنية</div>
+                <div className="text-[11px] text-zinc-300">{sessionExpiredReason}</div>
+              </div>
+            </div>
+            {onClearSessionNotice && (
+              <button
+                type="button"
+                onClick={onClearSessionNotice}
+                className="text-amber-400 hover:text-white text-[11px] font-bold px-1.5 py-0.5 rounded hover:bg-amber-500/20 transition-colors"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Feedback Messages */}
         {errorMsg && (

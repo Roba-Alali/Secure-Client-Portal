@@ -17,7 +17,8 @@ import {
   Info,
   Calendar,
   AlertCircle,
-  Smartphone
+  Smartphone,
+  LogOut
 } from 'lucide-react';
 
 interface ClientPortalProps {
@@ -28,6 +29,7 @@ interface ClientPortalProps {
   onOpenPdf: (doc: DocumentItem) => void;
   onOpenPresentation: (doc: DocumentItem) => void;
   onOpenVideo: (doc: DocumentItem) => void;
+  onLogout?: () => void;
 }
 
 export const ClientPortal: React.FC<ClientPortalProps> = ({
@@ -37,7 +39,8 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   watermarkConfig,
   onOpenPdf,
   onOpenPresentation,
-  onOpenVideo
+  onOpenVideo,
+  onLogout
 }) => {
   // Filter projects assigned to this client
   const clientProjects = projects.filter((p) =>
@@ -88,21 +91,34 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
           </div>
 
           {/* Dynamic Watermark Compliance Preview */}
-          <div className="bg-[#09090b]/80 border border-zinc-800 p-3.5 rounded-2xl text-xs max-w-sm">
-            <div className="flex items-center justify-between text-zinc-400 mb-1.5 font-medium">
-              <span className="flex items-center gap-1.5 text-[#ff4b4f] font-bold">
-                <Sparkles className="w-3.5 h-3.5" />
-                العلامة المائية النشطة لحسابك:
-              </span>
-              <span className="text-[10px] text-emerald-400 font-mono">MMG Protected</span>
+          <div className="bg-[#09090b]/80 border border-zinc-800 p-3.5 rounded-2xl text-xs max-w-sm flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-zinc-400 mb-1.5 font-medium">
+                <span className="flex items-center gap-1.5 text-[#ff4b4f] font-bold">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  العلامة المائية النشطة لحسابك:
+                </span>
+                <span className="text-[10px] text-emerald-400 font-mono">MMG Protected</span>
+              </div>
+              <div className="font-mono text-[11px] text-zinc-200 bg-zinc-950 px-2.5 py-1.5 rounded-xl border border-zinc-800 truncate" dir="ltr">
+                MMG VIP • {currentClient.name} • {currentClient.email}
+              </div>
+              <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-zinc-800/80 text-[10px] text-emerald-400 font-semibold">
+                <Smartphone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>درع حماية الهاتف الذكي نشط (حظر لقطات الشاشة واللمس المتعدد)</span>
+              </div>
             </div>
-            <div className="font-mono text-[11px] text-zinc-200 bg-zinc-950 px-2.5 py-1.5 rounded-xl border border-zinc-800 truncate" dir="ltr">
-              MMG VIP • {currentClient.name} • {currentClient.email}
-            </div>
-            <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-zinc-800/80 text-[10px] text-emerald-400 font-semibold">
-              <Smartphone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>درع حماية الهاتف الذكي نشط (حظر لقطات الشاشة واللمس المتعدد)</span>
-            </div>
+
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="mt-3 w-full py-1.5 px-3 bg-zinc-900/90 hover:bg-rose-500/15 border border-zinc-800 hover:border-rose-500/30 rounded-xl text-zinc-300 hover:text-rose-400 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                title="إنهاء الجلسة والخروج الفوري من البوابة"
+              >
+                <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                <span>إنهاء الجلسة والخروج من البوابة</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

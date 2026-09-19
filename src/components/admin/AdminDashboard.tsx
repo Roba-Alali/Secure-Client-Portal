@@ -1874,6 +1874,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <span>تفعيل النبض الديناميكي للعلامة المائية (Drift Pulse)</span>
                 </label>
               </div>
+
+              {/* Session Termination & Exit Protection */}
+              <div className="space-y-2 pt-3 border-t border-zinc-800">
+                <div className="text-xs font-bold text-amber-400 flex items-center gap-1.5 mb-2">
+                  <Lock className="w-4 h-4" />
+                  <span>سياسة حماية الجلسات وإنهاء الدخول (Session Auto-Termination):</span>
+                </div>
+
+                <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={localWm.autoTerminateOnExit !== false}
+                    onChange={(e) => setLocalWm({ ...localWm, autoTerminateOnExit: e.target.checked })}
+                    className="rounded accent-[#E40107]"
+                  />
+                  <span className="font-semibold text-white">إنهاء الجلسة فور إغلاق المتصفح أو مغادرة النافذة (حظر تذكر الدخول الدائم)</span>
+                </label>
+
+                <div className="flex items-center justify-between text-xs text-zinc-400 pt-1">
+                  <span>مهلة الخمول التلقائية لإغلاق الجلسة (دقائق):</span>
+                  <select
+                    value={localWm.sessionTimeoutMinutes || 15}
+                    onChange={(e) => setLocalWm({ ...localWm, sessionTimeoutMinutes: parseInt(e.target.value) || 15 })}
+                    className="bg-[#09090b] border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white"
+                  >
+                    <option value={5}>5 دقائق من الخمول</option>
+                    <option value={10}>10 دقائق من الخمول</option>
+                    <option value={15}>15 دقيقة (موصى بها أمنياً)</option>
+                    <option value={30}>30 دقيقة</option>
+                    <option value={60}>ساعة واحدة</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
             {/* Live Interactive Preview */}

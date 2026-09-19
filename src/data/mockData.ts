@@ -439,7 +439,9 @@ export const initialWatermarkConfig: WatermarkConfig = {
   obscureOnAppSwitch: true,
   multiTouchGestureShield: true,
   dynamicFloatingPill: false,
-  antiCropCornerStamps: true
+  antiCropCornerStamps: true,
+  autoTerminateOnExit: true,
+  sessionTimeoutMinutes: 15
 };
 
 export const initialLoginLogs: LoginLog[] = [
