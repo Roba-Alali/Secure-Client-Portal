@@ -421,6 +421,14 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
                         console.warn('Fallback: PDF render failed:', err);
                       }}
                     />
+                    <div className="mt-3 flex items-center justify-center">
+                      <button
+                        onClick={() => setViewMode('summary')}
+                        className="text-[11px] text-zinc-400 hover:text-white transition-colors underline underline-offset-4"
+                      >
+                        الانتقال إلى وضع ملخص الوثيقة وقراءة المحتوى
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
