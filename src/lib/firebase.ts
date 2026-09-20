@@ -62,12 +62,20 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 // Test connection on boot as mandated by Firebase skill
 export async function testConnection(): Promise<boolean> {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    // Add a race with a timeout so a slow backend does not hang or produce unhandled errors
+    const fetchPromise = getDocFromServer(doc(db, 'test', 'connection'));
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('connection timeout')), 8000)
+    );
+    await Promise.race([fetchPromise, timeoutPromise]);
     console.log('[Firestore] Live Cloud Connection established successfully.');
     return true;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('[Firestore] Connection warning: the client is offline or starting.');
+    if (error instanceof Error) {
+      if (error.message.includes('the client is offline') || error.message.includes('timeout') || error.message.includes('unavailable')) {
+        console.warn('[Firestore] Operating in client cache/offline mode:', error.message);
+        return false;
+      }
     }
     return false;
   }

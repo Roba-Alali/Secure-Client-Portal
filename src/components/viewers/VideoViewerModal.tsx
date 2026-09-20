@@ -55,20 +55,6 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
   const [fallbackIndex, setFallbackIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Dynamic moving watermark position that periodically shifts across the video frame
-  const [dynamicWatermarkPos, setDynamicWatermarkPos] = useState({ top: '20%', left: '25%' });
-
-  useEffect(() => {
-    // Periodically shift the floating security watermark to unpredictable locations every 4 seconds
-    const interval = setInterval(() => {
-      const randomTop = Math.floor(15 + Math.random() * 65);
-      const randomLeft = Math.floor(10 + Math.random() * 60);
-      setDynamicWatermarkPos({ top: `${randomTop}%`, left: `${randomLeft}%` });
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, []);
-
   // Initial video URL resolution
   const initialUrl = (
     (document.uploadedFileUrl && !document.uploadedFileUrl.startsWith('indexeddb://') ? document.uploadedFileUrl : null) ||
@@ -314,30 +300,21 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
         >
           <div className="w-full h-full flex items-center justify-center">
             <div className="relative w-full max-w-5xl aspect-video bg-black rounded-3xl border border-zinc-800/90 shadow-2xl overflow-hidden flex flex-col justify-center items-center group">
-              {/* Dynamic Watermark Layer */}
+              {/* Dynamic Watermark Layer with clean, non-obtrusive video settings */}
               <WatermarkOverlay
-                config={watermarkConfig}
+                config={{
+                  ...watermarkConfig,
+                  // Ensure clean unobtrusive watermark over video without heavy clutter
+                  opacity: Math.min(watermarkConfig.opacity, 0.16),
+                  density: 'low',
+                  driftAnimation: false,
+                  dynamicFloatingPill: false
+                }}
                 clientEmail={client.email}
                 clientName={client.name}
                 clientIp={client.ipAddress || '197.34.12.88'}
                 documentTitle={document.title}
               />
-
-              {/* Floating Dynamic Watermark that periodically hops across the video frame */}
-              <div
-                className="absolute z-25 pointer-events-none transition-all duration-1000 ease-in-out select-none"
-                style={{
-                  top: dynamicWatermarkPos.top,
-                  left: dynamicWatermarkPos.left
-                }}
-              >
-                <div className="bg-black/65 backdrop-blur-sm border border-[#E40107]/40 px-3 py-1.5 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-mono font-bold text-white/90">
-                  <span className="w-2 h-2 rounded-full bg-[#E40107] animate-ping" />
-                  <span className="text-[#ff4b4f]">{client.email}</span>
-                  <span className="text-zinc-400">|</span>
-                  <span className="text-zinc-200">MMG VIP STREAM</span>
-                </div>
-              </div>
 
               {/* Discreet Top Badge */}
               <div className="absolute top-4 right-4 z-30 bg-zinc-950/85 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-[#E40107]/30 text-xs font-mono text-[#ff4b4f] font-bold flex items-center gap-2 pointer-events-none shadow-lg">

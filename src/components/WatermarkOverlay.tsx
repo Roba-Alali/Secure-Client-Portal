@@ -19,30 +19,6 @@ export const WatermarkOverlay: React.FC<WatermarkOverlayProps> = ({
 }) => {
   if (!config.enabled) return null;
 
-  // Real-time second counter for non-falsifiable watermark
-  const [liveSeconds, setLiveSeconds] = useState(new Date().getSeconds());
-  
-  // Coordinates for wandering anti-crop floating watermark
-  const [pillCoords, setPillCoords] = useState({ top: 35, left: 45 });
-
-  useEffect(() => {
-    const secTimer = setInterval(() => {
-      setLiveSeconds(new Date().getSeconds());
-    }, 1000);
-
-    // Reposition wandering anti-crop watermark pill every 3.5 seconds
-    const moveTimer = setInterval(() => {
-      const randomTop = Math.floor(Math.random() * 60) + 15; // 15% to 75%
-      const randomLeft = Math.floor(Math.random() * 60) + 15; // 15% to 75%
-      setPillCoords({ top: randomTop, left: randomLeft });
-    }, 3500);
-
-    return () => {
-      clearInterval(secTimer);
-      clearInterval(moveTimer);
-    };
-  }, []);
-
   const watermarkText = useMemo(() => {
     const now = new Date();
     const dateStr = now.toLocaleDateString('ar-SA') + ' ' + now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -63,7 +39,7 @@ export const WatermarkOverlay: React.FC<WatermarkOverlayProps> = ({
     text = text.replace(/{name}/g, clientName);
     text = text.replace(/{doc}/g, documentTitle);
     return text.trim();
-  }, [config.template, config.showIp, clientEmail, clientIp, clientName, documentTitle, liveSeconds]);
+  }, [config.template, config.showIp, clientEmail, clientIp, clientName, documentTitle]);
 
   // Determine grid density
   const gridCount = config.density === 'high' ? 16 : config.density === 'low' ? 6 : 9;
