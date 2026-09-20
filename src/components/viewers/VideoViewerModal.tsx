@@ -55,6 +55,20 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
   const [fallbackIndex, setFallbackIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Dynamic moving watermark position that periodically shifts across the video frame
+  const [dynamicWatermarkPos, setDynamicWatermarkPos] = useState({ top: '20%', left: '25%' });
+
+  useEffect(() => {
+    // Periodically shift the floating security watermark to unpredictable locations every 4 seconds
+    const interval = setInterval(() => {
+      const randomTop = Math.floor(15 + Math.random() * 65);
+      const randomLeft = Math.floor(10 + Math.random() * 60);
+      setDynamicWatermarkPos({ top: `${randomTop}%`, left: `${randomLeft}%` });
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   // Initial video URL resolution
   const initialUrl = (
     (document.uploadedFileUrl && !document.uploadedFileUrl.startsWith('indexeddb://') ? document.uploadedFileUrl : null) ||
@@ -309,17 +323,33 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
                 documentTitle={document.title}
               />
 
+              {/* Floating Dynamic Watermark that periodically hops across the video frame */}
+              <div
+                className="absolute z-25 pointer-events-none transition-all duration-1000 ease-in-out select-none"
+                style={{
+                  top: dynamicWatermarkPos.top,
+                  left: dynamicWatermarkPos.left
+                }}
+              >
+                <div className="bg-black/65 backdrop-blur-sm border border-[#E40107]/40 px-3 py-1.5 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-mono font-bold text-white/90">
+                  <span className="w-2 h-2 rounded-full bg-[#E40107] animate-ping" />
+                  <span className="text-[#ff4b4f]">{client.email}</span>
+                  <span className="text-zinc-400">|</span>
+                  <span className="text-zinc-200">MMG VIP STREAM</span>
+                </div>
+              </div>
+
               {/* Discreet Top Badge */}
               <div className="absolute top-4 right-4 z-30 bg-zinc-950/85 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-[#E40107]/30 text-xs font-mono text-[#ff4b4f] font-bold flex items-center gap-2 pointer-events-none shadow-lg">
                 <span className="w-2 h-2 rounded-full bg-[#E40107] animate-pulse" />
                 <span>MMG VIP • {client.email}</span>
               </div>
 
-              {/* HTML5 Video Element */}
+              {/* HTML5 Video Element with strict DRM restrictions: nodownload, noremoteplayback, disablePictureInPicture */}
               <video
                 ref={videoRef}
                 src={resolvedVideoUrl}
-                className="w-full h-full object-contain cursor-pointer"
+                className="w-full h-full object-contain cursor-pointer select-none"
                 onTimeUpdate={handleTimeUpdate}
                 onEnded={() => setIsPlaying(false)}
                 onLoadedData={() => {
@@ -332,6 +362,8 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
                 onClick={togglePlay}
                 playsInline
                 controls={false}
+                controlsList="nodownload nofullscreen noremoteplayback"
+                disablePictureInPicture
                 preload="auto"
               />
 
