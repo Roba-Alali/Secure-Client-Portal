@@ -246,34 +246,34 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
       dir="rtl"
     >
       {/* Top Header */}
-      <div className="h-16 border-b border-zinc-800/80 bg-[#0c0c0f]/95 px-4 md:px-6 flex items-center justify-between shrink-0 shadow-lg z-20">
-        <div className="flex items-center gap-3.5">
+      <div className="h-14 sm:h-16 border-b border-zinc-800/80 bg-[#0c0c0f]/95 px-3 sm:px-6 flex items-center justify-between shrink-0 shadow-lg z-20">
+        <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
           <MmgLogo size="sm" variant="icon" />
-          <div>
-            <h2 className="text-sm md:text-base font-bold text-white flex items-center gap-2">
-              <span>{document.title}</span>
-              <span className="bg-[#E40107]/15 text-[#ff4b4f] text-[11px] px-2.5 py-0.5 rounded-full border border-[#E40107]/30 flex items-center gap-1 font-semibold">
-                <Lock className="w-3 h-3" /> MMG VIP بث مشفر
+          <div className="min-w-0">
+            <h2 className="text-xs sm:text-base font-bold text-white flex items-center gap-1.5 sm:gap-2 truncate">
+              <span className="truncate">{document.title}</span>
+              <span className="hidden xs:flex bg-[#E40107]/15 text-[#ff4b4f] text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full border border-[#E40107]/30 items-center gap-1 font-semibold shrink-0">
+                <Lock className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> VIP مشفر
               </span>
             </h2>
-            <p className="text-xs text-zinc-400">
-              مدة العرض: {document.duration || formatTime(totalDuration)} • {client.company}
+            <p className="text-[10px] sm:text-xs text-zinc-400 truncate">
+              {document.duration || formatTime(totalDuration)} • {client.company}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* Fullscreen Toggle */}
           <button
             onClick={toggleFullscreen}
-            className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors"
+            className="p-1.5 sm:p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors"
             title={isFullscreen ? 'تصغير الشاشة' : 'ملء الشاشة'}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
 
           {/* Time Counter */}
-          <div className="flex items-center gap-2 text-xs font-mono bg-[#E40107]/10 text-[#ff4b4f] px-3 py-1.5 rounded-xl border border-[#E40107]/20">
+          <div className="hidden sm:flex items-center gap-2 text-xs font-mono bg-[#E40107]/10 text-[#ff4b4f] px-3 py-1.5 rounded-xl border border-[#E40107]/20">
             <Clock className="w-3.5 h-3.5" />
             <span>{Math.floor(secondsSpent / 60)}:{(secondsSpent % 60).toString().padStart(2, '0')}</span>
           </div>
@@ -281,7 +281,7 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
           {/* Close Button */}
           <button
             onClick={handleClose}
-            className="p-2 rounded-xl bg-zinc-900 hover:bg-[#E40107]/20 hover:text-[#ff4b4f] text-zinc-400 border border-zinc-800 transition-colors"
+            className="p-1.5 sm:p-2 rounded-xl bg-zinc-900 hover:bg-[#E40107]/20 hover:text-[#ff4b4f] text-zinc-400 border border-zinc-800 transition-colors"
             title="إغلاق المشغل"
           >
             <X className="w-5 h-5" />
@@ -290,17 +290,19 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
       </div>
 
       {/* Main Video Stage Area */}
-      <div className="flex-1 relative overflow-hidden bg-[#070709] flex flex-col justify-center items-center p-2 sm:p-4 md:p-6">
+      <div className="flex-1 relative overflow-y-auto sm:overflow-hidden bg-[#070709] flex flex-col justify-center items-center p-2 sm:p-4 md:p-6 w-full">
         <MobileScreenshotShield
           clientName={client.name}
           clientEmail={client.email}
           clientIp={client.ipAddress || '197.34.12.88'}
           documentTitle={document.title}
           enabled={watermarkConfig.mobileScreenshotShield !== false}
+          stageClassName="flex flex-col justify-center items-center h-full w-full"
+          hideToolbar={true}
         >
-          <div className="w-full max-w-5xl flex flex-col items-center">
+          <div className="w-full max-w-5xl flex flex-col items-center my-auto">
             {/* 1. Pure Video Frame Area - ONLY Video & Watermark (Controllers are outside) */}
-            <div className="relative w-full aspect-video bg-black rounded-2xl md:rounded-3xl border border-zinc-800/90 shadow-2xl overflow-hidden flex flex-col justify-center items-center group">
+            <div className="relative w-full aspect-video bg-black rounded-2xl md:rounded-3xl border border-zinc-800/90 shadow-2xl overflow-hidden flex flex-col justify-center items-center group shrink-0">
               {/* Dynamic Watermark Layer - Only watermark visible on video */}
               <WatermarkOverlay
                 config={{

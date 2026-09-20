@@ -9,6 +9,8 @@ interface MobileScreenshotShieldProps {
   documentTitle?: string;
   enabled?: boolean;
   onSecurityEvent?: (type: string, details: string) => void;
+  stageClassName?: string;
+  hideToolbar?: boolean;
   children: React.ReactNode;
 }
 
@@ -20,6 +22,8 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
   documentTitle = 'مستند سري',
   enabled = true,
   onSecurityEvent,
+  stageClassName,
+  hideToolbar = false,
   children
 }) => {
   const [isObscured, setIsObscured] = useState(false);
@@ -346,14 +350,14 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
       <div
         ref={contentRef}
         id="drm-protected-stage"
-        className="w-full h-full"
+        className={`w-full h-full ${stageClassName || ''}`}
         style={{
           display: isObscured ? 'none' : 'block',
           opacity: isObscured ? 0 : 1,
           transition: 'none' // ZERO latency transition for hardware capture proofing
         }}
       >
-        <div className="w-full h-full">
+        <div className={`w-full h-full ${stageClassName || ''}`}>
           {children}
         </div>
 
@@ -433,59 +437,61 @@ export const MobileScreenshotShield: React.FC<MobileScreenshotShieldProps> = ({
       )}
 
       {/* 4. Top Security Controls Bar for Mobile & Desktop */}
-      <div className="absolute top-2 left-2 z-40 flex items-center gap-1.5 flex-wrap pointer-events-auto">
-        {/* Shield Status Badge */}
-        <button
-          onClick={() => setShowStatusModal(true)}
-          className="px-2.5 py-1 rounded-full bg-zinc-950/90 border border-emerald-500/40 text-emerald-400 text-[10px] font-mono font-bold shadow-lg flex items-center gap-1.5 hover:bg-zinc-900 transition-colors backdrop-blur-md"
-          title="انقر للاطلاع على تفاصيل درع الحماية"
-        >
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <Shield className="w-3 h-3 text-emerald-400" />
-          <span>درع منع التصوير نشط</span>
-        </button>
-
-        {/* Security Mode Selector */}
-        <div className="flex items-center bg-zinc-950/90 border border-zinc-800 rounded-full p-0.5 shadow-lg backdrop-blur-md">
+      {!hideToolbar && (
+        <div className="absolute top-2 left-2 z-40 flex items-center gap-1.5 flex-wrap pointer-events-auto">
+          {/* Shield Status Badge */}
           <button
-            onClick={() => setSecurityMode('auto')}
-            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
-              securityMode === 'auto'
-                ? 'bg-zinc-800 text-white shadow'
-                : 'text-zinc-400 hover:text-zinc-200'
-            }`}
-            title="الدرع التلقائي الذكي عند محاولة التقاط الشاشة"
+            onClick={() => setShowStatusModal(true)}
+            className="px-2.5 py-1 rounded-full bg-zinc-950/90 border border-emerald-500/40 text-emerald-400 text-[10px] font-mono font-bold shadow-lg flex items-center gap-1.5 hover:bg-zinc-900 transition-colors backdrop-blur-md"
+            title="انقر للاطلاع على تفاصيل درع الحماية"
           >
-            تلقائي
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <Shield className="w-3 h-3 text-emerald-400" />
+            <span>درع منع التصوير نشط</span>
           </button>
 
-          <button
-            onClick={() => setSecurityMode('spotlight')}
-            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 transition-all ${
-              securityMode === 'spotlight'
-                ? 'bg-[#E40107] text-white shadow'
-                : 'text-zinc-400 hover:text-zinc-200'
-            }`}
-            title="عدسة القراءة المقاومة للتصوير (تشويش الصفحة باستثناء موضع اللمس)"
-          >
-            <Scan className="w-2.5 h-2.5" />
-            <span>عدسة الحماية</span>
-          </button>
+          {/* Security Mode Selector */}
+          <div className="flex items-center bg-zinc-950/90 border border-zinc-800 rounded-full p-0.5 shadow-lg backdrop-blur-md">
+            <button
+              onClick={() => setSecurityMode('auto')}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
+                securityMode === 'auto'
+                  ? 'bg-zinc-800 text-white shadow'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+              title="الدرع التلقائي الذكي عند محاولة التقاط الشاشة"
+            >
+              تلقائي
+            </button>
 
-          <button
-            onClick={() => setSecurityMode('hold_to_view')}
-            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 transition-all ${
-              securityMode === 'hold_to_view'
-                ? 'bg-[#E40107] text-white shadow'
-                : 'text-zinc-400 hover:text-zinc-200'
-            }`}
-            title="درع اللمس المقاوم للأزرار (المس مع الاستمرار للعرض)"
-          >
-            <Hand className="w-2.5 h-2.5" />
-            <span>درع اللمس</span>
-          </button>
+            <button
+              onClick={() => setSecurityMode('spotlight')}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 transition-all ${
+                securityMode === 'spotlight'
+                  ? 'bg-[#E40107] text-white shadow'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+              title="عدسة القراءة المقاومة للتصوير (تشويش الصفحة باستثناء موضع اللمس)"
+            >
+              <Scan className="w-2.5 h-2.5" />
+              <span>عدسة الحماية</span>
+            </button>
+
+            <button
+              onClick={() => setSecurityMode('hold_to_view')}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 transition-all ${
+                securityMode === 'hold_to_view'
+                  ? 'bg-[#E40107] text-white shadow'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+              title="درع اللمس المقاوم للأزرار (المس مع الاستمرار للعرض)"
+            >
+              <Hand className="w-2.5 h-2.5" />
+              <span>درع اللمس</span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 4. Security Alert Toast */}
       {securityToast && (
