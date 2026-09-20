@@ -290,7 +290,7 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
       </div>
 
       {/* Main Video Stage Area */}
-      <div className="flex-1 relative overflow-hidden bg-[#070709] flex items-center justify-center p-3 sm:p-6 md:p-8">
+      <div className="flex-1 relative overflow-hidden bg-[#070709] flex flex-col justify-center items-center p-2 sm:p-4 md:p-6">
         <MobileScreenshotShield
           clientName={client.name}
           clientEmail={client.email}
@@ -298,29 +298,24 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
           documentTitle={document.title}
           enabled={watermarkConfig.mobileScreenshotShield !== false}
         >
-          <div className="w-full h-full flex items-center justify-center">
-            <div className="relative w-full max-w-5xl aspect-video bg-black rounded-3xl border border-zinc-800/90 shadow-2xl overflow-hidden flex flex-col justify-center items-center group">
-              {/* Dynamic Watermark Layer with clean, non-obtrusive video settings */}
+          <div className="w-full max-w-5xl flex flex-col items-center">
+            {/* 1. Pure Video Frame Area - ONLY Video & Watermark (Controllers are outside) */}
+            <div className="relative w-full aspect-video bg-black rounded-2xl md:rounded-3xl border border-zinc-800/90 shadow-2xl overflow-hidden flex flex-col justify-center items-center group">
+              {/* Dynamic Watermark Layer - Only watermark visible on video */}
               <WatermarkOverlay
                 config={{
                   ...watermarkConfig,
-                  // Ensure clean unobtrusive watermark over video without heavy clutter
-                  opacity: Math.min(watermarkConfig.opacity, 0.16),
+                  opacity: Math.min(watermarkConfig.opacity, 0.18),
                   density: 'low',
                   driftAnimation: false,
-                  dynamicFloatingPill: false
+                  dynamicFloatingPill: false,
+                  antiCropCornerStamps: false
                 }}
                 clientEmail={client.email}
                 clientName={client.name}
                 clientIp={client.ipAddress || '197.34.12.88'}
                 documentTitle={document.title}
               />
-
-              {/* Discreet Top Badge */}
-              <div className="absolute top-4 right-4 z-30 bg-zinc-950/85 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-[#E40107]/30 text-xs font-mono text-[#ff4b4f] font-bold flex items-center gap-2 pointer-events-none shadow-lg">
-                <span className="w-2 h-2 rounded-full bg-[#E40107] animate-pulse" />
-                <span>MMG VIP • {client.email}</span>
-              </div>
 
               {/* HTML5 Video Element with strict DRM restrictions: nodownload, noremoteplayback, disablePictureInPicture */}
               <video
@@ -366,99 +361,100 @@ export const VideoViewerModal: React.FC<VideoViewerModalProps> = ({
                 </div>
               )}
 
-              {/* Big Center Play Button if paused & not in error */}
+              {/* Center Play/Pause indicator on click */}
               {!isPlaying && !hasError && (
                 <button
                   onClick={togglePlay}
-                  className="absolute inset-0 m-auto w-20 h-20 rounded-full bg-[#E40107] hover:bg-[#c90005] text-white flex items-center justify-center shadow-2xl shadow-red-950/90 transition-all transform hover:scale-110 z-20 border border-red-400/40"
+                  className="absolute inset-0 m-auto w-16 sm:w-20 h-16 sm:h-20 rounded-full bg-[#E40107]/90 hover:bg-[#c90005] text-white flex items-center justify-center shadow-2xl shadow-red-950/90 transition-all transform hover:scale-105 z-20 border border-red-400/30 backdrop-blur-sm"
                   title="تشغيل الفيديو"
                 >
-                  <Play className="w-8 h-8 fill-current ml-1" />
+                  <Play className="w-7 sm:w-8 h-7 sm:h-8 fill-current ml-1" />
                 </button>
               )}
+            </div>
 
-              {/* Bottom Video Controls Overlay */}
-              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black/85 to-transparent p-4 sm:p-5 z-20 opacity-95 transition-opacity">
-                {/* Interactive Progress Bar */}
+            {/* 2. External Controls Bar - OUTSIDE of the Video Area */}
+            <div className="w-full mt-3 bg-[#0f0f13] border border-zinc-800/90 rounded-2xl p-3 sm:p-4 shadow-xl z-20">
+              {/* Progress Bar (Outside Video) */}
+              <div
+                className="w-full h-2.5 bg-zinc-800 hover:h-3 rounded-full mb-3 cursor-pointer overflow-hidden transition-all relative group/progress"
+                onClick={(e) => {
+                  if (!videoRef.current) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const pos = (e.clientX - rect.left) / rect.width;
+                  videoRef.current.currentTime = pos * totalDuration;
+                }}
+              >
                 <div
-                  className="w-full h-2 bg-zinc-800/90 hover:h-2.5 rounded-full mb-3 cursor-pointer overflow-hidden transition-all"
-                  onClick={(e) => {
-                    if (!videoRef.current) return;
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const pos = (e.clientX - rect.left) / rect.width;
-                    videoRef.current.currentTime = pos * totalDuration;
-                  }}
-                >
-                  <div
-                    className="h-full bg-gradient-to-r from-[#E40107] to-red-500 transition-all"
-                    style={{ width: `${Math.min(100, Math.max(0, (currentTime / (totalDuration || 1)) * 100))}%` }}
-                  />
+                  className="h-full bg-gradient-to-r from-[#E40107] to-red-500 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, Math.max(0, (currentTime / (totalDuration || 1)) * 100))}%` }}
+                />
+              </div>
+
+              {/* Control Buttons & Timers (Outside Video) */}
+              <div className="flex flex-wrap items-center justify-between text-xs text-zinc-300 gap-2 sm:gap-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  {/* Play / Pause */}
+                  <button
+                    onClick={togglePlay}
+                    className="p-2.5 rounded-xl bg-zinc-800/90 hover:bg-zinc-700 text-white transition-colors flex items-center justify-center shadow-sm"
+                    title={isPlaying ? 'إيقاف مؤقت' : 'تشغيل'}
+                  >
+                    {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
+                  </button>
+
+                  {/* Rewind 10s */}
+                  <button
+                    onClick={() => handleSkip(-10)}
+                    className="p-2.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors border border-zinc-800/80"
+                    title="ترجيع 10 ثوانٍ"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+
+                  {/* Forward 10s */}
+                  <button
+                    onClick={() => handleSkip(10)}
+                    className="p-2.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors border border-zinc-800/80"
+                    title="تقديم 10 ثوانٍ"
+                  >
+                    <RotateCw className="w-4 h-4" />
+                  </button>
+
+                  {/* Volume Mute Toggle */}
+                  <button
+                    onClick={() => {
+                      if (videoRef.current) {
+                        videoRef.current.muted = !isMuted;
+                        setIsMuted(!isMuted);
+                      }
+                    }}
+                    className="p-2.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors border border-zinc-800/80"
+                    title={isMuted ? 'إلغاء الكتم' : 'كتم الصوت'}
+                  >
+                    {isMuted ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4" />}
+                  </button>
+
+                  {/* Time Counter */}
+                  <span className="font-mono text-xs text-zinc-200 px-3 py-1.5 bg-black/70 rounded-xl border border-zinc-800 shadow-inner" dir="ltr">
+                    {formatTime(currentTime)} / {formatTime(totalDuration)}
+                  </span>
                 </div>
 
-                {/* Control Icons and Timers */}
-                <div className="flex flex-wrap items-center justify-between text-xs text-zinc-300 gap-2">
-                  <div className="flex items-center gap-3">
-                    {/* Play / Pause */}
-                    <button
-                      onClick={togglePlay}
-                      className="p-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-white transition-colors"
-                      title={isPlaying ? 'إيقاف مؤقت' : 'تشغيل'}
-                    >
-                      {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                    </button>
-
-                    {/* Rewind 10s */}
-                    <button
-                      onClick={() => handleSkip(-10)}
-                      className="p-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors"
-                      title="ترجيع 10 ثوانٍ"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                    </button>
-
-                    {/* Forward 10s */}
-                    <button
-                      onClick={() => handleSkip(10)}
-                      className="p-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors"
-                      title="تقديم 10 ثوانٍ"
-                    >
-                      <RotateCw className="w-4 h-4" />
-                    </button>
-
-                    {/* Volume Mute Toggle */}
-                    <button
-                      onClick={() => {
-                        if (videoRef.current) {
-                          videoRef.current.muted = !isMuted;
-                          setIsMuted(!isMuted);
-                        }
-                      }}
-                      className="p-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors"
-                      title={isMuted ? 'إلغاء الكتم' : 'كتم الصوت'}
-                    >
-                      {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                    </button>
-
-                    {/* Time Counter */}
-                    <span className="font-mono text-xs text-zinc-300 px-2 py-1 bg-zinc-950/80 rounded-lg border border-zinc-800" dir="ltr">
-                      {formatTime(currentTime)} / {formatTime(totalDuration)}
-                    </span>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 text-[11px] text-zinc-400 font-medium bg-zinc-900/60 px-3 py-1.5 rounded-xl border border-zinc-800/60">
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#E40107]" />
+                    <span className="hidden sm:inline">مشغل وسائط MMG الآمن • بث مشفر</span>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 text-[11px] text-zinc-400 font-medium">
-                      <ShieldCheck className="w-3.5 h-3.5 text-[#E40107]" />
-                      <span className="hidden sm:inline">مشغل وسائط MMG الآمن • تشفير البث المباشر</span>
-                    </div>
-
-                    <button
-                      onClick={toggleFullscreen}
-                      className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
-                      title="ملء الشاشة"
-                    >
-                      <Maximize2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  {/* Fullscreen Button */}
+                  <button
+                    onClick={toggleFullscreen}
+                    className="p-2.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors border border-zinc-800/80"
+                    title="ملء الشاشة"
+                  >
+                    <Maximize2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             </div>
